@@ -12,7 +12,7 @@ class Plutino(object):
         None
     """
 
-    def __init__(self, date, quantity, label, tag, account, text):
+    def __init__(self, date, quantity, tag, label, account, text, balance):
         """Initialize a plutino instance.
 
         Arguments:
@@ -22,17 +22,21 @@ class Plutino(object):
             tag: str, item category
             account: str, account
             text: str, item details
+            balance: float
         """
 
         # set attributes
         self.date = date
         self.quantity = quantity
-        self.label = label
 
         # set item attributes
         self.tag = tag
+        self.label = label
         self.account = account
         self.text = text
+
+        # set balance
+        self.balance = balance
 
         return
 
@@ -47,8 +51,8 @@ class Plutino(object):
         """
 
         # create representation from attributes
-        formats = (self.date, self.quantity, self.label, self.tag, self.account, self.text)
-        representation = '< Plutino: {} {} {} {} {} {} >'.format(*formats)
+        formats = (self.date, self.quantity, self.tag, self.label, self.account, self.text[:80])
+        representation = '< Plutino: {} {} {}: {} ( {} ) {} >'.format(*formats)
 
         return representation
 
