@@ -4,6 +4,22 @@
 from cores import Core
 from plutinos import Plutino
 
+# import numpy
+import numpy
+
+# import sklearn
+from sklearn.linear_model import LinearRegression
+from sklearn.cluster import KMeans
+from sklearn.svm import OneClassSVM, SVC
+from sklearn.decomposition import PCA
+
+# import matplotlib for plots
+from matplotlib import pyplot
+from matplotlib import style as Style
+from matplotlib import rcParams
+Style.use('fast')
+rcParams['axes.formatter.useoffset'] = False
+
 
 # class Plutocrat to manage finances
 class Plutocrat(Core):
@@ -128,7 +144,7 @@ class Plutocrat(Core):
         quantity = float(amount.replace('$', '').replace(',', ''))
 
         # convert text to lowercase
-        text = description.lower().strip()
+        text = description.lower().replace('\n', ' ').strip()
 
         # find the longest label in keys so far
         labels = [label for label in plutons.keys() if label in text] + ['']
