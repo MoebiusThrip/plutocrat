@@ -57,7 +57,7 @@ class Plutocrat(Core):
 
         return representation
 
-    def _chart(self, plutinos, tag='all', averaging=7):
+    def _chart(self, plutinos, tag='all', averaging=14):
         """Plot the spending for a particular tag.
 
         Arguments:
