@@ -229,4 +229,37 @@ class Plutocrat(Core):
 
         return None
 
+    def key(self):
+        """Add an entry to 401(k) records.
+
+        Arguments:
+            None
+
+        Returns:
+            None
+        """
+
+        # load up keys
+        path = '../kays/kays.json'
+        kays = self._load(path)
+        kays = kays or {'kays': []}
+
+        # input details
+        date = input('>>> date? ')
+        account = input('>>> acount number? ')
+        company = input('>>> company? ')
+        job = input('>>> job? ')
+        balance = input('>>> balance? ')
+
+        # create record
+        record = {'date': date, 'account': account, 'job': job, 'company': company, 'balance': balance}
+
+        # append
+        kays['kays'].append(record)
+
+        # dump new kays
+        self._dump(kays, path)
+
+        return None
+
 
