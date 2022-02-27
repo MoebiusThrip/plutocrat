@@ -339,4 +339,28 @@ class Plutocrat(Core):
 
         return None
 
+    def pulverize(self):
+        """Get reports for tags.
 
+        Arguments:
+            None
+
+        Returns:
+            None
+        """
+
+        # make graph of all
+        self._chart(list(self))
+
+        # find all tags
+        tags = list(set([plutino.tag for plutino in self]))
+        for tag in tags:
+
+            # print tag
+            print(tag)
+
+            # make chart
+            plutinos = [plutino for plutino in self if plutino.tag == tag]
+            self._chart(plutinos, tag)
+
+        return None
