@@ -7,6 +7,9 @@ from plutinos import Plutino
 # import numpy
 import numpy
 
+# import datetime
+import datetime
+
 # import sklearn
 from sklearn.linear_model import LinearRegression
 from sklearn.cluster import KMeans
@@ -17,6 +20,7 @@ from sklearn.decomposition import PCA
 from matplotlib import pyplot
 from matplotlib import style as Style
 from matplotlib import rcParams
+import matplotlib.dates as Dates
 Style.use('fast')
 rcParams['axes.formatter.useoffset'] = False
 
@@ -52,6 +56,79 @@ class Plutocrat(Core):
         representation = ' < Plutocrat >'
 
         return representation
+
+    def _chart(self, plutinos, tag='all', averaging=7):
+        """Plot the spending for a particular tag.
+
+        Arguments:
+            plutinos: list of plutino instances
+            tag: str, tag for subset
+            averaging: int, moving average window for slopes
+
+        Returns:
+            None
+        """
+
+        # sort by date
+        plutinos.sort(key=lambda plutino: plutino.date)
+
+        # accumulate by date
+        accumulation = 0.0
+        points = {}
+        for plutino in plutinos:
+
+            # add quantity to accumulation
+            date = datetime.datetime.strptime(plutino.date, '%Y-%m-%d').timestamp() / (3600 * 24)
+            accumulation += plutino.quantity
+            points[date] = accumulation
+
+        # begin graph
+        pyplot.clf()
+        pyplot.title(tag)
+
+        # format xaxis as dates
+        formatter = Dates.DateFormatter("%m-%d")
+        pyplot.gca().xaxis.set_major_formatter(formatter)
+
+        # arrange all points
+        points = list(points.items())
+        points.sort(key=lambda pair: pair[0])
+
+        # plot line
+        horizontals = [point[0] for point in points]
+        verticals = [point[1] for point in points]
+        pyplot.plot(horizontals, verticals, 'b--')
+
+        # determine slopes
+        slopes = []
+        for point in points[1:]:
+
+            # find index of point greater than increment
+            subset = [pointii for pointii in points if pointii[0] < point[0] - averaging]
+
+            # check for length
+            if len(subset) > 0:
+
+                # get latest
+                latest = subset[-1]
+
+                # calculate slope
+                slope = (point[1] - latest[1]) / (point[0] - latest[0])
+
+                # add to plot
+                slopes.append((point[0], slope))
+
+        # plot slopes
+        secondary = pyplot.gca().twinx()
+        horizontals = [point[0] for point in slopes]
+        verticals = [point[1] for point in slopes]
+        secondary.plot(horizontals, verticals, 'g--')
+
+        # save plot
+        pyplot.savefig('../plots/{}.png'.format(tag))
+        pyplot.clf()
+
+        return None
 
     def _mine(self, row, plutons):
         """Mine the statement entry and add to the records.
