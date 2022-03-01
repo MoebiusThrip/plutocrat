@@ -189,9 +189,8 @@ class Plutocrat(Core):
 
         # create plutino
         plutino = Plutino(date, quantity, tag, label, account, text, balance)
-        self.append(plutino)
 
-        return None
+        return plutino
 
     def _supply(self, row, plutons):
         """Mine the statement entry and add to the records.
@@ -252,9 +251,8 @@ class Plutocrat(Core):
 
         # create plutino
         plutino = Plutino(date, quantity, tag, label, account, text, balance)
-        self.append(plutino)
 
-        return None
+        return plutino
 
     def accrete(self):
         """Gather up records, adding classification.
@@ -265,6 +263,9 @@ class Plutocrat(Core):
         Returns:
             None
         """
+
+        # begin plutinos
+        plutinos = []
 
         # load up plutons
         plutons = self._load('../output/plutons.json')
@@ -280,7 +281,7 @@ class Plutocrat(Core):
             for row in rows[1:]:
 
                 # mine the row
-                self._mine(row, plutons)
+                plutinos.append(self._mine(row, plutons))
 
             # resave plutons
             self._dump(plutons, '../output/plutons.json')
@@ -296,13 +297,18 @@ class Plutocrat(Core):
             for row in rows[1:]:
 
                 # mine the row
-                self._supply(row, plutons)
+                plutinos.append(self._supply(row, plutons))
 
             # resave plutons
             self._dump(plutons, '../output/plutons.json')
 
-        # sort by date
-        self.sort(key=lambda plutino: plutino.date)
+        # remove duplicates
+        skimmer = {(plutino.date, plutino.quantity, plutino.text): plutino for plutino in plutinos}
+        plutinos = list(skimmer.values())
+        plutinos.sort(key=lambda plutino: plutino.date)
+
+        # add to instance
+        [self.append(plutino) for plutino in plutinos]
 
         return None
 
