@@ -370,3 +370,31 @@ class Plutocrat(Core):
             self._chart(plutinos, tag)
 
         return None
+
+    def spelunk(self, tag, label=None):
+        """Gather up records, adding classification.
+
+        Arguments:
+            tag: str, particular tag to view
+            label: str, particular label to view
+
+        Returns:
+            None
+        """
+
+        # get all plutons
+        plutons = [pluton for pluton in self if pluton.tag == tag]
+
+        # if a label if given
+        if label:
+
+            # subset to label
+            plutons = [pluton for pluton in plutons if pluton.label == label]
+
+        # sort by date
+        plutons.sort(key=lambda pluton: pluton.date)
+
+        # report
+        self._tell(plutons)
+
+        return None
