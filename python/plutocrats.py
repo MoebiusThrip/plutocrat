@@ -371,6 +371,39 @@ class Plutocrat(Core):
 
         return None
 
+    def scan(self):
+        """Summarize all categories.
+
+        Arguments:
+            None
+
+        Returns:
+            None
+        """
+
+        # load up plutons
+        plutons = self._load('../output/plutons.json')
+
+        # group according to tag
+        plutons = list(plutons.items())
+        tags = self._group(plutons, lambda pair: pair[1])
+        tags = list(tags.items())
+        tags.sort(key=lambda pair: pair[0])
+        for tag, labels in tags:
+
+            # print
+            self._print('\n')
+            self._print('{}:'.format(tag))
+
+            # sort members
+            labels.sort()
+            for label in labels:
+
+                # print label
+                self._print('    {}'.format(label[0]))
+
+        return None
+
     def spelunk(self, tag, label=None):
         """Gather up records, adding classification.
 
