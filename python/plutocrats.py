@@ -405,7 +405,7 @@ class Plutocrat(Core):
         return None
 
     def spelunk(self, tag, label=None):
-        """Gather up records, adding classification.
+        """Print records for a tag.
 
         Arguments:
             tag: str, particular tag to view
