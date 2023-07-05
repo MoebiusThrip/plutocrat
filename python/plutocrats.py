@@ -188,8 +188,14 @@ class Plutocrat(Core):
             None
         """
 
-        # get relevant plutinos and sort by date
-        plutinos = [plutino for plutino in self if plutino.tag == tag]
+        # get all plutios by default
+        plutinos = [plutino for plutino in self]
+        if tag != 'all':
+
+            # get relevant plutinos and sort by date
+            plutinos = [plutino for plutino in self if plutino.tag == tag]
+
+        # sort
         plutinos.sort(key=lambda plutino: plutino.date)
 
         # get times as abscissa
@@ -217,61 +223,11 @@ class Plutocrat(Core):
         ordinates = [expenses, week, month]
         self.squid.splatter('{}_expenses'.format(tag), ordinates, 'time', dates, address, title, auxiliaries)
 
-        # # accumulate by date
-        # accumulation = 0.0
-        # points = {}
-        # for plutino in plutinos:
-        #
-        #     # add quantity to accumulation
-        #     date = datetime.datetime.strptime(plutino.date, '%Y-%m-%d').timestamp() / (3600 * 24)
-        #     accumulation += plutino.quantity
-        #     points[date] = accumulation
-        #
-        # # begin graph
-        # pyplot.clf()
-        # pyplot.title(tag)
-        #
-        # # format xaxis as dates
-        # formatter = Dates.DateFormatter("%m-%d")
-        # pyplot.gca().xaxis.set_major_formatter(formatter)
-        #
-        # # arrange all points
-        # points = list(points.items())
-        # points.sort(key=lambda pair: pair[0])
-        #
-        # # plot line
-        # horizontals = [point[0] for point in points]
-        # verticals = [point[1] for point in points]
-        # pyplot.plot(horizontals, verticals, 'b--')
-        #
-        # # determine slopes
-        # slopes = []
-        # for point in points[1:]:
-        #
-        #     # find index of point greater than increment
-        #     subset = [pointii for pointii in points if pointii[0] < point[0] - averaging]
-        #
-        #     # check for length
-        #     if len(subset) > 0:
-        #
-        #         # get latest
-        #         latest = subset[-1]
-        #
-        #         # calculate slope
-        #         slope = (point[1] - latest[1]) / (point[0] - latest[0])
-        #
-        #         # add to plot
-        #         slopes.append((point[0], slope))
-        #
-        # # plot slopes
-        # secondary = pyplot.gca().twinx()
-        # horizontals = [point[0] for point in slopes]
-        # verticals = [point[1] for point in slopes]
-        # secondary.plot(horizontals, verticals, 'g--')
-        #
-        # # save plot
-        # pyplot.savefig('../plots/{}.png'.format(tag))
-        # pyplot.clf()
+        # if last date within range
+        if (datetime.datetime.now() - datetime.datetime.fromtimestamp(dates[-1] / 1000)) < datetime.timedelta(days=30):
+
+            # print tag and latest monthly average
+            self._print('{}: {}'.format(tag, month[-1]))
 
         return None
 
@@ -500,8 +456,13 @@ class Plutocrat(Core):
             None
         """
 
+        # clear old plots
+        self._clean('../plots')
+        self._clean('../ores')
+
         # make graph of all
         self._chart(list(self))
+        self._draw()
 
         # find all tags
         tags = list(set([plutino.tag for plutino in self]))
@@ -518,6 +479,26 @@ class Plutocrat(Core):
             self._chart(plutinos, tag)
 
         return None
+
+    def repair(self, label, tag):
+        """Recategorize a label.
+
+        Arguments:
+            label: str, the label
+            tag: str, new tag
+
+        Returns:
+            None
+        """
+
+        # load up plutons
+        plutons = self._load('../output/plutons.json')
+
+        # add pluton
+        plutons[label] = tag
+
+        # resave plutons
+        self._dump(plutons, '../output/plutons.json')
 
     def scan(self):
         """Summarize all categories.
