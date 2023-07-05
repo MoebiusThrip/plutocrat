@@ -285,7 +285,7 @@ class Squid(Hydra):
 
         # stash file
         destination = '{}/{}'.format(self.sink, relative)
-        self.stash(features, destination, scan=True)
+        self.stash(features, destination)
 
         return None
 

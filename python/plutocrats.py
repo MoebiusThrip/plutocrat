@@ -64,6 +64,45 @@ class Plutocrat(Core):
 
         return representation
 
+    def _average(self, plutinos, window):
+        """Create moving average based on a window of days.
+
+        Arguments:
+            plutinos: list of plutinos
+            window: int, number of days
+
+        Returns:
+            list of floats
+        """
+
+        # begin average
+        average = []
+
+        # collect datetimes
+        dates = [datetime.datetime.strptime(plutino.date, '%Y-%m-%d') for plutino in plutinos]
+        quantities = [plutino.quantity for plutino in plutinos]
+
+        # for each plutiono
+        for quantity, date in zip(quantities, dates):
+
+            # set adcumulation
+            accumulation = 0.0
+
+            # for each other plutino
+            for quantityii, dateii in zip(quantities, dates):
+
+                # get the delta
+                delta = dateii - date
+                if (delta > datetime.timedelta(days=-window)) & (delta <= datetime.timedelta(days=0)):
+
+                    # add to accumulation
+                    accumulation += quantityii / window
+
+            # add acumulatino
+            average.append(accumulation)
+
+        return average
+
     def _chart(self, plutinos, tag='all', averaging=14):
         """Plot the spending for a particular tag.
 
@@ -160,17 +199,23 @@ class Plutocrat(Core):
         # get expenses
         expenses = [plutino.quantity for plutino in plutinos]
 
+        # compute week moving average
+        week = self._average(plutinos, 7)
+        month = self._average(plutinos, 31)
+
         # add auxiliaries
         auxiliaries = {}
         auxiliaries['cost'] = [plutino.quantity for plutino in plutinos]
         auxiliaries['label'] = [plutino.label for plutino in plutinos]
         auxiliaries['date'] = [plutino.date for plutino in plutinos]
         auxiliaries['text'] = [plutino.text for plutino in plutinos]
+        auxiliaries['account'] = [plutino.account for plutino in plutinos]
 
         # make plot
         address = 'ores/{}_record.h5'.format(tag)
         title = '{} expenditures'.format(tag)
-        self.squid.splatter('{}_expenses'.format(tag), [expenses], 'time', dates, address, title, auxiliaries)
+        ordinates = [expenses, week, month]
+        self.squid.splatter('{}_expenses'.format(tag), ordinates, 'time', dates, address, title, auxiliaries)
 
         # # accumulate by date
         # accumulation = 0.0

@@ -2578,11 +2578,11 @@ class Hydra(Core):
                 # print feature
                 self._print(feature.name, feature.slash, feature.data.dtype)
 
-                # if string
-                if feature.data.dtype in ('<U10', '<U15', '<U51'):
+            # if string
+            if '<U' in str(feature.data.dtype):
 
-                    # reformat
-                    feature.data = feature.data.astype('S')
+                # reformat
+                feature.data = feature.data.astype('S')
 
             # try to
             try:
