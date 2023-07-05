@@ -2,6 +2,10 @@
 
 # import modules
 from cores import Core
+from features import Feature
+from formulas import Formula
+from hydras import Hydra
+from squids import Squid
 from plutinos import Plutino
 
 # import numpy
@@ -39,6 +43,9 @@ class Plutocrat(Core):
         Arguments:
             None
         """
+
+        # initalize squid
+        self.squid = Squid('..')
 
         return
 
@@ -127,6 +134,99 @@ class Plutocrat(Core):
         # save plot
         pyplot.savefig('../plots/{}.png'.format(tag))
         pyplot.clf()
+
+        return None
+
+    def _draw(self, tag='all', averaging=14):
+        """Plot the spending for a particular tag as hdf5 file.
+
+        Arguments:
+            plutinos: list of plutino instances
+            tag: str, tag for subset
+            averaging: int, moving average window for slopes
+
+        Returns:
+            None
+        """
+
+        # get relevant plutinos and sort by date
+        plutinos = [plutino for plutino in self if plutino.tag == tag]
+        plutinos.sort(key=lambda plutino: plutino.date)
+
+        # get times as abscissa
+        dates = [datetime.datetime.strptime(plutino.date, '%Y-%m-%d').timestamp() for plutino in plutinos]
+        dates = [date * 1000 for date in dates]
+
+        # get expenses
+        expenses = [plutino.quantity for plutino in plutinos]
+
+        # add auxiliaries
+        auxiliaries = {}
+        auxiliaries['cost'] = [plutino.quantity for plutino in plutinos]
+        auxiliaries['label'] = [plutino.label for plutino in plutinos]
+        auxiliaries['date'] = [plutino.date for plutino in plutinos]
+        auxiliaries['text'] = [plutino.text for plutino in plutinos]
+
+        # make plot
+        address = 'ores/{}_record.h5'.format(tag)
+        title = '{} expenditures'.format(tag)
+        self.squid.splatter('{}_expenses'.format(tag), [expenses], 'time', dates, address, title, auxiliaries)
+
+        # # accumulate by date
+        # accumulation = 0.0
+        # points = {}
+        # for plutino in plutinos:
+        #
+        #     # add quantity to accumulation
+        #     date = datetime.datetime.strptime(plutino.date, '%Y-%m-%d').timestamp() / (3600 * 24)
+        #     accumulation += plutino.quantity
+        #     points[date] = accumulation
+        #
+        # # begin graph
+        # pyplot.clf()
+        # pyplot.title(tag)
+        #
+        # # format xaxis as dates
+        # formatter = Dates.DateFormatter("%m-%d")
+        # pyplot.gca().xaxis.set_major_formatter(formatter)
+        #
+        # # arrange all points
+        # points = list(points.items())
+        # points.sort(key=lambda pair: pair[0])
+        #
+        # # plot line
+        # horizontals = [point[0] for point in points]
+        # verticals = [point[1] for point in points]
+        # pyplot.plot(horizontals, verticals, 'b--')
+        #
+        # # determine slopes
+        # slopes = []
+        # for point in points[1:]:
+        #
+        #     # find index of point greater than increment
+        #     subset = [pointii for pointii in points if pointii[0] < point[0] - averaging]
+        #
+        #     # check for length
+        #     if len(subset) > 0:
+        #
+        #         # get latest
+        #         latest = subset[-1]
+        #
+        #         # calculate slope
+        #         slope = (point[1] - latest[1]) / (point[0] - latest[0])
+        #
+        #         # add to plot
+        #         slopes.append((point[0], slope))
+        #
+        # # plot slopes
+        # secondary = pyplot.gca().twinx()
+        # horizontals = [point[0] for point in slopes]
+        # verticals = [point[1] for point in slopes]
+        # secondary.plot(horizontals, verticals, 'g--')
+        #
+        # # save plot
+        # pyplot.savefig('../plots/{}.png'.format(tag))
+        # pyplot.clf()
 
         return None
 
@@ -364,6 +464,9 @@ class Plutocrat(Core):
 
             # print tag
             print(tag)
+
+            # make hdf5 file
+            self._draw(tag)
 
             # make chart
             plutinos = [plutino for plutino in self if plutino.tag == tag]
