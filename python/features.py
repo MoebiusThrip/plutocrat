@@ -227,6 +227,15 @@ class Feature(object):
         # get dictionary representation
         dictionary = self.__dict__
 
+        # alter array to min and max, shape
+        array = dictionary['data']
+
+        # if array is not None
+        if array is not None:
+
+            # rewrite with min, max
+            dictionary['data'] = '{}, {} to {}'.format(array.shape, array.min(), array.max())
+
         return dictionary
 
     def distil(self, function=None, subset=None, refill=False):
