@@ -648,14 +648,11 @@ class Hydra(Core):
             array: numpy array,
             destination: str, filepath
             name: str, name of science
-            category: str, name of group
+            category: list of str, address of group
 
         Returns:
             None
         """
-
-        # recast category as list
-        category = category.split('/')
 
         # begin hdf4 file
         four = HDF(destination, HC.WRITE | HC.CREATE)
@@ -665,19 +662,18 @@ class Hydra(Core):
 
         # scan for registry
         registry = list(self._scan(four).items())
-        registry.sort(key=lambda pair: category in pair[1], reverse=True)
+
+        # sort for best match
+        registry.sort(key=lambda pair: category == pair[1], reverse=True)
         identity = registry[0][0]
-        self._tell(registry)
-        self._print(registry[0])
 
         # find the correctly named sd
         group = groups.attach(identity)
         tags = group.tagrefs()
-        self._print(tags)
         for tag, number in tags:
 
-            # if a science data set
-            if tag == HC.DFTAG_NDG:
+            # try to
+            try:
 
                 # get attributes
                 dataset = science.select(science.reftoindex(number))
@@ -687,27 +683,15 @@ class Hydra(Core):
                 if nameii == name:
 
                     # insert
-                    self._print('inserting {}...'.format(name))
-                    dataset[:] = array
-
-            # if a table
-            if tag == HC.DFTAG_VH:
-
-                # get attributes
-                table = tables.attach(number, 1)
-
-                # write table
-                rank, _, _, dims, nameii = table.inquire()
-
-                # insert new data
-                if nameii == name:
-
-                    # write table
                     print('inserting {}...'.format(name))
-                    table.write([[member] for member in array[0].tolist()])
+                    dataset[:] = array[0]
 
-                    # and detach
-                    table.detach()
+            # otherwise
+            except HDF4Error as error:
+
+                # alert
+                pass
+                #self._print(error)
 
         # close all apis
         groups.end()
