@@ -33,6 +33,7 @@ try:
     from pyhdf.HDF import HDF, HDF4Error, HC
     from pyhdf.SD import SD, SDC
     from pyhdf.V import V
+    from pyhdf.error import HDF4Error
 
 # unless it is not installed
 except (ImportError, SystemError):
