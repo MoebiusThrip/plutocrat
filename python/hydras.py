@@ -359,6 +359,61 @@ class Hydra(Core):
 
         return collection
 
+    def _compress(self, corners, trackwise, rowwise):
+        """Compress the latitude or longitude bounds based on compression factors.
+
+        Arguments:
+            corners: dict of corner arrays
+            trackwise: north-south compression factor
+            rowwise: east-west compression factor
+
+        Returns:
+            numpy array
+        """
+
+        # set directions
+        compasses = ['southwest', 'southeast', 'northeast', 'northwest']
+
+        # # for each corner
+        # for compass in compasses:
+        #
+        #     # shift negative longitudes to positive
+        #     corner = corners[compass][:, :, 1]
+        #     corners[compass][:, :, 1] = numpy.where(corner < 0, corner + 360, corner)
+
+        # get shape
+        shape = corners['southwest'].shape
+
+        # get selected trackwise indices and rowwise indices
+        selection = numpy.array([index for index in range(shape[0]) if index % trackwise == 0])
+        selectionii = numpy.array([index for index in range(shape[1]) if index % rowwise == 0])
+
+        # adjust based on factors
+        adjustment = numpy.array([min([index + trackwise - 1, shape[0] - 1]) for index in selection])
+        adjustmentii = numpy.array([min([index + rowwise - 1, shape[1] - 1]) for index in selectionii])
+
+        # begin compression
+        compression = {}
+
+        # adjust southwest
+        compression['southwest'] = corners['southwest'][selection]
+        compression['southwest'] = compression['southwest'][:, selectionii]
+        compression['southeast'] = corners['southeast'][selection]
+        compression['southeast'] = compression['southeast'][:, adjustmentii]
+        compression['northeast'] = corners['northeast'][adjustment]
+        compression['northeast'] = compression['northeast'][:, adjustmentii]
+        compression['northwest'] = corners['northwest'][adjustment]
+        compression['northwest'] = compression['northwest'][:, selectionii]
+
+        # # for each corner
+        # for compass in compasses:
+        #
+        #     # shift negative longitudes to positive
+        #     corner = compression[compass][:, :, 1]
+        #     compression[compass][:, :, 1] = numpy.where(corner >= 180, corner - 360, corner)
+
+        return compression
+
     def _convert(self, path, destination, names=None):
         """Convert an hdf4 file path to an hdf5 file.
 
@@ -391,6 +446,33 @@ class Hydra(Core):
         self._print('{} converted.'.format(path))
 
         return contents
+
+    def _cross(self, bounds):
+        """Adjust for longitude bounds that cross the dateline.
+
+        Arguments:
+            bounds: numpy array of bounds
+
+        Returns:
+            numpy array
+        """
+
+        # for each image
+        for image in range(bounds.shape[0]):
+
+            # and each row
+            for row in range(bounds.shape[1]):
+
+                # get the bounds
+                polygon = bounds[image][row]
+
+                # check for discrepancy
+                if any([(entry < -170) for entry in polygon]) and any([entry > 170 for entry in polygon]):
+
+                    # adjust bounds
+                    bounds[image][row] = numpy.where(polygon > 170, polygon, polygon + 360)
+
+        return bounds
 
     def _depopulate(self):
         """Depopulate the instance.
@@ -530,6 +612,131 @@ class Hydra(Core):
         five = h5py.File(path, 'r')
 
         return five
+
+    def _frame(self, latitude, longitude):
+        """Construct the corners of polygons from latitude and longitude coordinates.
+
+        Arguments:
+            latitude: numpy array
+            longitude: numpy array
+
+        Returns:
+            dict of numpy arrays, the corner points
+        """
+
+        # get main shape
+        shape = latitude.shape
+
+        # # adjust longitude for negative values
+        # longitude = numpy.where(longitude < 0, longitude + 360, longitude)
+
+        # initialize all four corners, with one layer for latitude and one for longitude
+        northwest = numpy.zeros((*shape, 2))
+        northeast = numpy.zeros((*shape, 2))
+        southwest = numpy.zeros((*shape, 2))
+        southeast = numpy.zeros((*shape, 2))
+
+        # create latitude frame, with one more row and image on each side
+        frame = numpy.zeros((shape[0] + 2, shape[1] + 2))
+        frame[1: shape[0] + 1, 1: shape[1] + 1] = latitude
+
+        # extend sides of frame by extrapolation
+        frame[1: -1, 0] = 2 * latitude[:, 0] - latitude[:, 1]
+        frame[1: -1, -1] = 2 * latitude[:, -1] - latitude[:, -2]
+        frame[0, 1:-1] = 2 * latitude[0, :] - latitude[1, :]
+        frame[-1, 1:-1] = 2 * latitude[-1, :] - latitude[-2, :]
+
+        # extend corners
+        frame[0, 0] = 2 * frame[1, 1] - frame[2, 2]
+        frame[0, -1] = 2 * frame[1, -2] - frame[2, -3]
+        frame[-1, 0] = 2 * frame[-2, 1] - frame[-3, 2]
+        frame[-1, -1] = 2 * frame[-2, -2] - frame[-3, -3]
+
+        # create longitude frame, with one more row and image on each side
+        frameii = numpy.zeros((shape[0] + 2, shape[1] + 2))
+        frameii[1: shape[0] + 1, 1: shape[1] + 1] = longitude
+
+        # extend sides of frame by extrapolation
+        frameii[1: -1, 0] = 2 * longitude[:, 0] - longitude[:, 1]
+        frameii[1: -1, -1] = 2 * longitude[:, -1] - longitude[:, -2]
+        frameii[0, 1:-1] = 2 * longitude[0, :] - longitude[1, :]
+        frameii[-1, 1:-1] = 2 * longitude[-1, :] - longitude[-2, :]
+
+        # extend corners
+        frameii[0, 0] = 2 * frameii[1, 1] - frameii[2, 2]
+        frameii[0, -1] = 2 * frameii[1, -2] - frameii[2, -3]
+        frameii[-1, 0] = 2 * frameii[-2, 1] - frameii[-3, 2]
+        frameii[-1, -1] = 2 * frameii[-2, -2] - frameii[-3, -3]
+
+        # populate interior polygon corners image by image
+        for image in range(0, shape[0]):
+
+            # and row by row
+            for row in range(0, shape[1]):
+
+                # frame indices are off by 1
+                imageii = image + 1
+                rowii = row + 1
+
+                # by averaging latitude frame at diagonals
+                northwest[image, row, 0] = (frame[imageii, rowii] + frame[imageii + 1][rowii - 1]) / 2
+                northeast[image, row, 0] = (frame[imageii, rowii] + frame[imageii + 1][rowii + 1]) / 2
+                southwest[image, row, 0] = (frame[imageii, rowii] + frame[imageii - 1][rowii - 1]) / 2
+                southeast[image, row, 0] = (frame[imageii, rowii] + frame[imageii - 1][rowii + 1]) / 2
+
+                # and by averaging longitude longitudes at diagonals
+                northwest[image, row, 1] = (frameii[imageii, rowii] + frameii[imageii + 1][rowii - 1]) / 2
+                northeast[image, row, 1] = (frameii[imageii, rowii] + frameii[imageii + 1][rowii + 1]) / 2
+                southwest[image, row, 1] = (frameii[imageii, rowii] + frameii[imageii - 1][rowii - 1]) / 2
+                southeast[image, row, 1] = (frameii[imageii, rowii] + frameii[imageii - 1][rowii + 1]) / 2
+
+        # fix longitude edge cases, by looking for crisscrossing, and truncating
+        northwest[:, :, 1] = numpy.where(northwest[:, :, 1] < longitude, northwest[:, :, 1], longitude)
+        northeast[:, :, 1] = numpy.where(northeast[:, :, 1] > longitude, northeast[:, :, 1], longitude)
+        southwest[:, :, 1] = numpy.where(southwest[:, :, 1] < longitude, southwest[:, :, 1], longitude)
+        southeast[:, :, 1] = numpy.where(southeast[:, :, 1] > longitude, southeast[:, :, 1], longitude)
+
+        # average all overlapping corners
+        overlap = southeast[1:, :-1, :] + southwest[1:, 1:, :] + northwest[:-1, 1:, :] + northeast[:-1, :-1, :]
+        average = overlap / 4
+
+        # transfer average
+        southeast[1:, :-1, :] = average
+        southwest[1:, 1:, :] = average
+        northwest[:-1, 1:, :] = average
+        northeast[:-1, :-1, :] = average
+
+        # average western edge
+        average = (southwest[1:, 0, :] + northwest[:-1, 0, :]) / 2
+        southwest[1:, 0, :] = average
+        northwest[:-1, 0, :] = average
+
+        # average eastern edge
+        average = (southeast[1:, -1, :] + northeast[:-1, -1, :]) / 2
+        southeast[1:, -1, :] = average
+        northeast[:-1, -1, :] = average
+
+        # average northern edge
+        average = (northwest[-1, 1:, :] + northeast[-1, :-1, :]) / 2
+        northwest[-1, 1:, :] = average
+        northeast[-1, :-1, :] = average
+
+        # average southern edge
+        average = (southwest[0, 1:, :] + southeast[0, :-1, :]) / 2
+        southwest[0, 1:, :] = average
+        southeast[0, :-1, :] = average
+
+        # # subtact 360 from any longitudes over 180
+        # northwest[:, :, 1] = numpy.where(northwest[:, :, 1] >= 180, northwest[:, :, 1] - 360, northwest[:, :, 1])
+        # northeast[:, :, 1] = numpy.where(northeast[:, :, 1] >= 180, northeast[:, :, 1] - 360, northeast[:, :, 1])
+        # southeast[:, :, 1] = numpy.where(southeast[:, :, 1] >= 180, southeast[:, :, 1] - 360, southeast[:, :, 1])
+        # southwest[:, :, 1] = numpy.where(southwest[:, :, 1] >= 180, southwest[:, :, 1] - 360, southwest[:, :, 1])
+
+        # collect corners
+        corners = {'northwest': northwest, 'northeast': northeast}
+        corners.update({'southwest': southwest, 'southeast': southeast})
+
+        return corners
 
     def _gather(self, data, path, route=None, mode=None, scan=False):
         """Gather all routes and shapes from a datafile.
@@ -722,6 +929,71 @@ class Hydra(Core):
             tag = self._pad(int(abs(degrees)), 3) + 'E' * (degrees >= 0) + 'W' * (degrees < 0)
 
         return tag
+
+    def _orientate(self, latitude, longitude):
+        """Create corners by orienting latitude bounds and longitude bounds.
+
+        Arguments:
+            latitude: numpy array, latitude bounds
+            longitude: numpy array, longitude bounds
+
+        Returns:
+            dict of numpy arrays
+        """
+
+        # add 360 to all negative longitude bounnds
+        longitude = numpy.where(longitude < 0, longitude + 360, longitude)
+
+        # get all cardinal directions
+        cardinals = {'south': latitude.min(axis=2), 'north': latitude.max(axis=2)}
+        cardinals.update({'west': longitude.min(axis=2), 'east': longitude.max(axis=2)})
+
+        # begin corners with zeros
+        compasses = ('northwest', 'northeast', 'southeast', 'southwest')
+        compassesii = ('northeast', 'southeast', 'southwest', 'northwest')
+        corners = {compass: numpy.zeros((latitude.shape[0], latitude.shape[1], 2)) for compass in compasses}
+
+        # double up bounds
+        latitude = latitude.transpose(2, 1, 0)
+        longitude = longitude.transpose(2, 1, 0)
+        latitude = numpy.vstack([latitude, latitude, latitude]).transpose(2, 1, 0)
+        longitude = numpy.vstack([longitude, longitude, longitude]).transpose(2, 1, 0)
+
+        # go through each position
+        for index in range(4):
+
+            # check against corners and add if south and west are the same
+            mask = (latitude[:, :, index] == cardinals['north'])
+            maskii = (longitude[:, :, index] < longitude[:, :, index + 2])
+            masque = numpy.logical_and(mask, maskii)
+
+            # for each point
+            for way, compass in enumerate(compasses):
+
+                # add corners
+                corners[compass][:, :, 0] = numpy.where(masque, latitude[:, :, index + way], corners[compass][:, :, 0])
+                corners[compass][:, :, 1] = numpy.where(masque, longitude[:, :, index + way], corners[compass][:, :, 1])
+
+            # check against corners and add if south and west are the same
+            mask = (latitude[:, :, index] == cardinals['north'])
+            maskii = (longitude[:, :, index] > longitude[:, :, index + 2])
+            masque = numpy.logical_and(mask, maskii)
+
+            # for each point
+            for way, compass in enumerate(compassesii):
+
+                # add corners
+                corners[compass][:, :, 0] = numpy.where(masque, latitude[:, :, index + way], corners[compass][:, :, 0])
+                corners[compass][:, :, 1] = numpy.where(masque, longitude[:, :, index + way], corners[compass][:, :, 1])
+
+        # subtract 360 from longitudes
+        for compass in compasses:
+
+            # subtract form longitude
+            corner = corners[compass][:, :, 1]
+            corners[compass][:, :, 1] = numpy.where(corner > 180, corner - 360, corner)
+
+        return corners
 
     def _parse(self, path):
         """Parse file name for orbital context information.
@@ -932,6 +1204,52 @@ class Hydra(Core):
 
         return result
 
+    def _polymerize(self, latitude, longitude, resolution):
+        """Construct polygons from latitude and longitude bounds.
+
+        Arguments:
+            latitude: numpy array of latitude bounds
+            longitude: numpy array of longitude bounds
+            resolution: int, vertical compression factor
+
+        Returns:
+            numpy.array
+        """
+
+        # squeeze arrays
+        latitude = latitude.squeeze()
+        longitude = longitude.squeeze()
+
+        # if bounds are given
+        if len(latitude.shape) > 2:
+
+            # orient the bounds
+            corners = self._orientate(latitude, longitude)
+
+        # otherwise
+        else:
+
+            # get corners from latitude and longitude points
+            corners = self._frame(latitude, longitude)
+
+        # compress corners vertically
+        corners = self._compress(corners, resolution, 1)
+
+        # construct bounds
+        compasses = ('southwest', 'southeast', 'northeast', 'northwest')
+        arrays = [corners[compass][:, :, 0] for compass in compasses]
+        bounds = numpy.stack(arrays, axis=2)
+        arrays = [corners[compass][:, :, 1] for compass in compasses]
+        boundsii = numpy.stack(arrays, axis=2)
+
+        # adjust polygon  boundaries to avoid crossing dateline
+        boundsii = self._cross(boundsii)
+
+        # make polygons
+        polygons = numpy.dstack([bounds, boundsii])
+
+        return polygons
+
     def _populate(self, features, discard=True):
         """Populate the instance with feature records.
 
@@ -1101,6 +1419,25 @@ class Hydra(Core):
         self.paths = paths
 
         return None
+
+    def _resolve(self, array, resolution):
+        """Pare down an array to only mod zero entries based on resolution.
+
+        Arguments:
+            array: numpy array
+            resolution: int, number of pixels to combine
+
+        Returns:
+            numpy array
+        """
+
+        # get indices at mod 0
+        indices = numpy.array([index for index in range(array.shape[0]) if index % resolution == 0])
+
+        # apply to array
+        resolution = array[indices]
+
+        return resolution
 
     def _refer(self, features, reference=None):
         """Create a reference for a set of features for quicker lookup.
