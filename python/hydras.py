@@ -987,6 +987,51 @@ class Hydra(Core):
 
         return None
 
+    def _project(self, novel, abscissa, ordinate):
+        """Project a new abscissa onto another abscissas and ordinate by linear interpolation.
+
+        Arguments:
+            novel: list of floats, new x values
+            abscissas: list of floats, x values
+            ordinate: list of floats, y values
+
+        Returns:
+            numpy array, new y values
+        """
+
+        # create squared arrays with new axis for new shape
+        ordinateii = numpy.array([ordinate] * len(novel))
+        abscissaii = numpy.array([abscissa] * len(novel))
+        novelii = numpy.array([novel] * len(abscissa)).transpose(1, 0)
+
+        # create lesser and greater matrices
+        lesser = abscissaii < novelii
+        greater = abscissaii > novelii
+
+        # make sure at least the first lesser value is true
+        lesser[:, 0] = True
+
+        # make sure at least the last greater value is true
+        greater[:, -1] = True
+
+        # create left and right mask
+        left = lesser & numpy.roll(greater, -1, axis=1)
+        right = numpy.roll(lesser, 1, axis=1) & greater
+
+        # create horizontal brackets
+        horizontal = (abscissaii * left.astype(int)).sum(axis=1)
+        horizontalii = (abscissaii * right.astype(int)).sum(axis=1)
+
+        # create vertical brackets
+        vertical = (ordinateii * left.astype(int)).sum(axis=1)
+        verticalii = (ordinateii * right.astype(int)).sum(axis=1)
+
+        # perform interpolation
+        slope = (verticalii - vertical) / (horizontalii - horizontal)
+        projection = vertical + slope * (novel - horizontal)
+
+        return projection
+
     def _register(self):
         """Construct all file paths.
 
@@ -1405,12 +1450,13 @@ class Hydra(Core):
 
         return subset
 
-    def _view(self, data, fields=None):
+    def _view(self, data, pixel=None, fields=None):
         """Print list of data shapes from a dataset.
 
         Arguments:
             data: dict of numpy arrays.
             fields: list of str, the fields to see
+            pixel: tuple of ints, particular pixel
 
         Returns:
             None
@@ -1431,14 +1477,23 @@ class Hydra(Core):
                 # try to
                 try:
 
-                    # print each one
-                    self._print(name, array.shape, '{} to {}'.format(array.min(), array.max()))
+                    # if pariruclar pixel
+                    if pixel:
+
+                        # print each one
+                        self._print(name, array.shape, '{}: {}'.format(pixel, array[pixel]))
+
+                    else:
+
+                        # print each one
+                        self._print(name, array.shape, '{} to {}'.format(array.min(), array.max()))
 
                 # unless error
-                except ValueError:
+                except (ValueError, IndexError):
 
-                    # print error
-                    self._print(name, array.shape, 'error in min, max!')
+                    # print alert
+                    self._print('{}: pass'.format(name))
+                    pass
 
         return None
 
@@ -1741,10 +1796,11 @@ class Hydra(Core):
 
         return treasure
 
-    def gist(self, address=False):
+    def gist(self, pixel=None, address=False):
         """Summarize data in the file.
 
         Arguments:
+            pixel: tuple of ints, particular pixel
             address: boolean, use full addres?
 
         Returns:
@@ -1761,7 +1817,7 @@ class Hydra(Core):
             data = {feature.slash: feature.distil() for feature in self}
 
         # print to screen
-        self._view(data)
+        self._view(data, pixel=pixel)
 
         return None
 
