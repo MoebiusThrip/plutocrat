@@ -462,8 +462,17 @@ class Feature(object):
         factor = self.attributes.get('scale_factor', 1)
         offset = self.attributes.get('add_offset', 0)
 
-        # apply factors
-        array = (array * factor) + offset
+        # try to
+        try:
+
+            # apply factors
+            array = (array * factor) + offset
+
+        # unless a string
+        except TypeError:
+
+            # print
+            pass
 
         return array
 
