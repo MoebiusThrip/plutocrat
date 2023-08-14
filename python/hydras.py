@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 # hydras.py for the Hydra class to parse hdf files
 
 # import local classes
@@ -1831,6 +1833,9 @@ class Hydra(Core):
                     # print alert
                     self._print('{}: pass'.format(name))
                     pass
+
+        # print spacer
+        self._print('')
 
         return None
 

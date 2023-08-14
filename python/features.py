@@ -458,6 +458,13 @@ class Feature(object):
             # perform subset
             array = subsetting[length][axis](data)
 
+        # retrieve scale factors and offsets
+        factor = self.attributes.get('scale_factor', 1)
+        offset = self.attributes.get('add_offset', 0)
+
+        # apply factors
+        array = (array * factor) + offset
+
         return array
 
     def spill(self):
