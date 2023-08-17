@@ -25,6 +25,9 @@ from collections import Counter
 import numpy
 import math
 
+# import netcdf4
+import netCDF4
+
 # import h5py to read h5 files
 import h5py
 
@@ -600,18 +603,28 @@ class Hydra(Core):
 
         return blueprint
 
-    def _fetch(self, path):
+    def _fetch(self, path, net=False):
         """Link to the contents of an hdf5 file.
 
         Arguments:
             path: str, file path
+            net: boolean, use netcdf
 
         Returns:
             hdf5 file
         """
 
-        # open up the hdf5 file
-        five = h5py.File(path, 'r')
+        # if netCDF4
+        if net:
+
+            # fetch from netCDF4
+            five = netCDF4.Dataset(path)
+
+        # otherwise
+        else:
+
+            # open up the hdf5 file with h5py
+            five = h5py.File(path, 'r')
 
         return five
 
@@ -740,6 +753,119 @@ class Hydra(Core):
 
         return corners
 
+    def _garner(self, data, path, route=None, mode=None, scan=False):
+        """Gather all routes and shapes from a datafile.
+
+        Arguments:
+            data: dict or h5
+            path: str, file path
+            route=None: current route
+            mode=None: mode to restrict gathering with
+
+        Returns:
+            list of dicts
+        """
+
+        # initialize routes for first round
+        route = route or []
+
+        # initialize collection
+        collection = []
+
+        # test mode condition
+        allow = True
+        if mode:
+
+            # if the specific mode is not in the route
+            address = ':'.join(route)
+            if len(route) > 2 and mode not in address:
+
+                # stop gathering
+                allow = False
+
+        # only proceed if allowed by mode condition
+        if allow:
+
+            # try to
+            try:
+
+                # get all fields
+                for field in data.groups:
+
+                    # if scan
+                    if scan:
+
+                        # print the field
+                        self._print(field)
+
+                    # # check for variables
+                    # slash = '/'.join([''] + route + [field])
+                    #
+                    # self._print(slash)
+
+                    # get variables
+                    variables = data[field].variables
+
+                    # for each variable
+                    for variable, info in variables.items():
+
+                        # begin attributes with dimensions
+                        attributes = {'dimensions': info.dimensions, 'netCDF': True}
+                        for attribute in info.ncattrs():
+
+                            # add to attributes
+                            attributes[attribute] = info.getncattr(attribute)
+
+                        # add entry to collection
+                        parameters = {'route': route + [field, variable], 'shape': info.shape, 'path': path}
+                        parameters.update({'attributes': attributes, 'format': info.dtype})
+                        feature = Feature(**parameters)
+                        collection.append(feature)
+
+                    # get dimensions
+                    dimensions = data[field].dimensions
+
+                    # for each variable
+                    for dimension, info in dimensions.items():
+
+                        # begin attributes with dimensions
+                        attributes = {'netCDF': True, 'dimension': True}
+                        attributes.update({'name': info.name, 'size': info.size, 'group': info.group().name})
+                        attributes.update({'isunlimited': info.isunlimited()})
+
+                        # add entry to collection
+                        parameters = {'route': route + [field, dimension], 'shape': (info.size,), 'path': path}
+                        parameters.update({'attributes': attributes, 'format': int})
+                        feature = Feature(**parameters)
+                        collection.append(feature)
+
+                    # get groups
+                    groups = data[field].groups
+
+                    # if there are no groups, variables or dimensions
+                    if not groups and not variables and not dimensions:
+
+                        # begin attributes with dimensions
+                        info = {attribute: data[field].getncattr(attribute) for attribute in data[field].ncattrs()}
+                        attributes = {'netCDF': True, 'metadata': True}
+                        attributes.update(info)
+
+                        # add entry to collection
+                        parameters = {'route': route + [field], 'shape': (0,), 'path': path}
+                        parameters.update({'attributes': attributes, 'format': str})
+                        feature = Feature(**parameters)
+                        collection.append(feature)
+
+                    # and add each field to the collection
+                    collection += self._garner(data[field], path, route + [field], mode=mode, scan=scan)
+
+            # unless it is an endpoint
+            except AttributeError:
+
+                self._print('error: {}'.format(route))
+
+        return collection
+
     def _gather(self, data, path, route=None, mode=None, scan=False):
         """Gather all routes and shapes from a datafile.
 
@@ -796,7 +922,7 @@ class Hydra(Core):
 
                     # determine shape and type
                     shape = data.shape
-                    format = data.dtype
+                    form = data.dtype
 
                     # if scanning
                     if scan:
@@ -812,11 +938,11 @@ class Hydra(Core):
                     attributes = {name: value for name, value in data.attrs.items() if name not in problems}
 
                     # if the type is simple
-                    if len(format) < 1:
+                    if len(form) < 1:
 
                         # add entry to collection
                         parameters = {'route': route, 'shape': shape, 'path': path}
-                        parameters.update({'attributes': attributes, 'format': format})
+                        parameters.update({'attributes': attributes, 'format': form})
                         feature = Feature(**parameters)
                         collection.append(feature)
 
@@ -824,7 +950,7 @@ class Hydra(Core):
                     else:
 
                         # convert to numpy dtype
-                        conversion = numpy.dtype(format)
+                        conversion = numpy.dtype(form)
 
                         # get attributes
                         problems = ('DIMENSION_LIST', 'REFERENCE_LIST')
@@ -833,12 +959,12 @@ class Hydra(Core):
                         # for each member of the type
                         for name in conversion.names:
 
-                            # get format
-                            format = conversion.fields[name]
+                            # get form
+                            form = conversion.fields[name]
 
                             # create feature
                             parameters = {'route': route + [name], 'shape': shape, 'path': path}
-                            parameters.update({'attributes': attributes, 'format': format})
+                            parameters.update({'attributes': attributes, 'format': form})
                             feature = Feature(**parameters)
                             collection.append(feature)
 
@@ -1884,10 +2010,12 @@ class Hydra(Core):
         five = five or self._fetch(self.current)
 
         # for each attribute
+        globals = {}
         for name, contents in five.attrs.items():
 
             # print
-            self._print('{}: {}'.format(name, contents))
+            globals[name] = contents
+            # self._print('{}: {}'.format(name, contents))
 
         # try to
         try:
@@ -1901,7 +2029,7 @@ class Hydra(Core):
             # skip
             pass
 
-        return None
+        return globals
 
     def augment(self, path, features, destination):
         """Augment a file with a feature.
@@ -2212,7 +2340,7 @@ class Hydra(Core):
 
         return array
 
-    def ingest(self, path=0, mode=None, discard=True, names=None, folder='tmp', scan=False):
+    def ingest(self, path=0, mode=None, discard=True, names=None, folder='tmp', scan=False, net=False):
         """Ingest the data from a particular path, populating the instance with features.
 
         Arguments:
@@ -2260,12 +2388,25 @@ class Hydra(Core):
             # replace path
             path = conversion
 
-        # fetch the hdf5 file
-        with self._fetch(path) as five:
+        # if netcdf
+        if net:
 
-            # collect all features
-            features = self._gather(five, path, mode=mode, scan=scan)
-            self._populate(features, discard=discard)
+            # fetch the netcdf4 file
+            with self._fetch(path, net=True) as net:
+
+                # collect all features
+                features = self._garner(net, path, mode=mode, scan=scan)
+                self._populate(features, discard=discard)
+
+        # otherwise
+        else:
+
+            # fetch the hdf5 file
+            with self._fetch(path) as five:
+
+                # collect all features
+                features = self._gather(five, path, mode=mode, scan=scan)
+                self._populate(features, discard=discard)
 
         # set current path
         self.current = path
@@ -2664,6 +2805,21 @@ class Hydra(Core):
 
         return None
 
+    def net(self, path):
+        """Open a file with netcdf4.
+
+        Arguments:
+            path: str, filepath
+
+        Returns:
+            netCDF4 Dataset
+        """
+
+        # open with netCDF4
+        net = netCDF4.Dataset(path)
+
+        return net
+
     def plant(self, level=0, destination=None, subset=None):
         """Make a tree of the file contents of an h5 file, to a certain level.
 
@@ -2800,20 +2956,25 @@ class Hydra(Core):
 
         return None
 
-    def spawn(self, destination, data, attributes=None):
+    def spawn(self, destination, data, attributes=None, net=False, globals=None):
         """Create an hdf file at destination from a dictionary of arrays.
 
         Arguments:
             destination: str, pathname of destination file
             data: dict of str: numpy address / array pairs
             attributes: dict of attribute dictionaries
+            dimensions: dict of dimension scales
+            net: boolean, use netcdf4?
+            globals: dict of global attributes
 
         Returns:
             None
         """
 
-        # set attributes reservoir
+        # set attributes and dimensions reservoir
         attributes = attributes or {}
+
+        self._print('makig features..')
 
         # for each member
         features = []
@@ -2823,11 +2984,21 @@ class Hydra(Core):
             attribute = attributes.get(address, {})
 
             # create feature
-            feature = Feature(address.split('/'), numpy.array(array), attributes=attribute)
+            # feature = Feature(address.split('/'), numpy.array(array), attributes=attribute)
+            feature = Feature(address.split('/'), array, attributes=attribute)
             features.append(feature)
 
-        # stash file at destination
-        self.stash(features, destination)
+        # if netcdf4
+        if net:
+
+            # stash file using netCDF4
+            self.store(features, destination, globals=globals)
+
+        # otherwise
+        else:
+
+            # stash file at destination using h5py
+            self.stash(features, destination)
 
         return None
 
@@ -2979,6 +3150,18 @@ class Hydra(Core):
                     # add to tensor
                     tensor.attrs[attribute] = information
 
+                # # if feature in dimensions
+                # if feature.slash in dimensions.keys():
+                #
+                #     # also add dummy variable to activate dimension
+                #     slash = 'dimensions/{}'.format(feature.slash)
+                #     data = numpy.array(list(range(dimensions[feature.slash])))
+                #     dummy = five.create_dataset(slash, data=data, compression=compression)
+                #     dummy.make_scale(self._file(slash))
+                #
+                #     # attach to tensor
+                #     tensor.dims[0].attach_scale(dummy)
+
                 # create link
                 if feature.link:
 
@@ -2999,6 +3182,108 @@ class Hydra(Core):
 
         # print messate
         self._print('{} stashed.'.format(destination))
+
+        return None
+
+    def store(self, features, destination, globals=None, link=None, mode='w', compression=None, scan=False):
+        """Stash a group of features in a netCDF file.
+
+        Arguments:
+            features: list of dicts
+            destination: str, destination filepath
+            globals: dict of global attributes
+            link: str, name of link folder
+            mode: str, writemode
+            compression: compression option
+            scan: scan feature names?
+            dimensions: dict of dimension scales
+
+        Returns:
+            None
+        """
+
+        # fill all features if not yet filled
+        [feature.fill() for feature in features]
+
+        # set globals
+        globals = globals or {}
+
+        # begin netcdf4 file
+        with netCDF4.Dataset(destination, mode='w', format='NETCDF4') as net:
+
+            self._print('writing globals...')
+
+            # for each global
+            for name, contents in globals.items():
+
+                # add to attributes
+                net.setncattr(name, contents)
+
+            # get all groups
+            groups = [self._fold(feature.slash) for feature in features]
+            groups = self._skim(groups)
+            groups.sort()
+
+            # separate varialbes and dimensions
+            dimensions = [feature for feature in features if feature.attributes.get('dimension', False)]
+            variables = [feature for feature in features if not feature.attributes.get('dimension', False)]
+
+            # for each group
+            for name in groups:
+
+                print('group: {}'.format(name))
+
+                # if name not blank
+                if name:
+
+                    # create group
+                    group = net.createGroup(name)
+
+                    # for each global
+                    for name, contents in globals.items():
+
+                        # also add to group attributes for now
+                        group.setncattr(name, contents)
+
+            # for each dimension:
+            for feature in dimensions:
+
+                print('dimension: ', feature.name, feature.attributes['size'])
+
+                # unpack label
+                group = self._fold(feature.slash)
+                name = self._file(feature.slash)
+                size = feature.attributes['size']
+
+                # if group is legit
+                if group:
+
+                    # create dimension
+                    _ = net[group].createDimension(name, size)
+
+                # othwrwiawe
+                else:
+
+                    self._print('group, name: {} {}'.format(group, name))
+
+                    # creaer as root dimensionn
+                    _ = net.createDimension(name, size)
+
+            # for each variable
+            for feature in variables:
+
+                print(feature.name, feature.shape, feature.data.shape, feature.data.dtype)
+                print(feature.slash)
+
+                # add variable
+                scales = feature.attributes.get('dimensions', ())
+
+                print(scales)
+
+                variable = net.createVariable(feature.slash, feature.data.dtype, scales)
+                #variable = net.createVariable(feature.slash, numpy.float32, scales)
+
+                variable[:] = feature.data
 
         return None
 
