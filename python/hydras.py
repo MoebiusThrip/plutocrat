@@ -1946,7 +1946,7 @@ class Hydra(Core):
                     if pixel:
 
                         # print each one
-                        self._print(name, array.shape, '{}: {}'.format(pixel, array[pixel]))
+                        self._print(name, array.shape, '{}: {}'.format(pixel, array[pixel[:len(array.shape)]]))
 
                     else:
 
@@ -1954,7 +1954,7 @@ class Hydra(Core):
                         self._print(name, array.shape, '{} to {}'.format(array.min(), array.max()))
 
                 # unless error
-                except (ValueError, IndexError):
+                except (ValueError, IndexError, TypeError):
 
                     # print alert
                     self._print('{}: pass'.format(name))
