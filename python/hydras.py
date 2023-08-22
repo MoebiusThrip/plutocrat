@@ -3211,8 +3211,6 @@ class Hydra(Core):
         # begin netcdf4 file
         with netCDF4.Dataset(destination, mode='w', format='NETCDF4') as net:
 
-            self._print('writing globals...')
-
             # for each global
             for name, contents in globals.items():
 
@@ -3231,8 +3229,6 @@ class Hydra(Core):
             # for each group
             for name in groups:
 
-                print('group: {}'.format(name))
-
                 # if name not blank
                 if name:
 
@@ -3248,7 +3244,8 @@ class Hydra(Core):
             # for each dimension:
             for feature in dimensions:
 
-                print('dimension: ', feature.name, feature.attributes['size'])
+                # print status
+                self._print('dimension: ', feature.name, feature.attributes['size'])
 
                 # unpack label
                 group = self._fold(feature.slash)
@@ -3261,28 +3258,25 @@ class Hydra(Core):
                     # create dimension
                     _ = net[group].createDimension(name, size)
 
-                # othwrwiawe
+                # otherwise
                 else:
 
-                    self._print('group, name: {} {}'.format(group, name))
-
-                    # creaer as root dimensionn
+                    # create as root dimension
                     _ = net.createDimension(name, size)
 
             # for each variable
             for feature in variables:
 
-                print(feature.name, feature.shape, feature.data.shape, feature.data.dtype)
-                print(feature.slash)
+                # print status
+                self._print(feature.name, feature.shape, feature.data.shape, feature.data.dtype)
 
-                # add variable
+                # get dimension scales
                 scales = feature.attributes.get('dimensions', ())
 
-                print(scales)
+                # construct variable with compression features
+                variable = net.createVariable(feature.slash, feature.data.dtype, scales, zlib=True, complevel=9)
 
-                variable = net.createVariable(feature.slash, feature.data.dtype, scales)
-                #variable = net.createVariable(feature.slash, numpy.float32, scales)
-
+                # add the data
                 variable[:] = feature.data
 
         return None
