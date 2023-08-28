@@ -603,6 +603,30 @@ class Hydra(Core):
 
         return blueprint
 
+    def _excise(self, polygons, tracer):
+        """Excise bad polygons from the dataset.
+
+        Arguments:
+            polygons: numpy array
+            tracer: numpy array
+
+        Returns:
+            tuple of numpy arrays
+        """
+
+        # extract longitudes from polygons
+        longitudes = polygons[:, :, 4:]
+
+        # calculation standard deviations
+        deviation = longitudes.std(axis=2)
+        mask = (deviation < 20)
+
+        # apply mask
+        polygonsii = polygons[mask]
+        tracerii = tracer[mask]
+
+        return polygonsii, tracerii
+
     def _fetch(self, path, net=False):
         """Link to the contents of an hdf5 file.
 
@@ -2369,7 +2393,18 @@ class Hydra(Core):
 
             # look for keyword
             paths = [entry for entry in self.paths if path in entry]
-            path = paths[0]
+
+            # try to
+            try:
+
+                # get first entry
+                path = paths[0]
+
+            # unless not in folder
+            except IndexError:
+
+                # in which case, leave path alonge
+                pass
 
         # retrieve the collection
         if self._stage(path)['extension'] in ('.he4', '.he'):
