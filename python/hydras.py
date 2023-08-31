@@ -5,7 +5,18 @@
 # import local classes
 from cores import Core
 from features import Feature
-from formulas import Formula
+
+# try to
+try:
+
+    # import formulas
+    from formulas import Formula
+
+# unless not avaialbe
+except ImportError:
+
+    # nevermind
+    pass
 
 # import general tools
 import os
