@@ -120,7 +120,7 @@ class Hydra(Core):
         self._tell(self.paths)
 
         # create representation
-        representation = ' < Hydra instance at: {}, current: ( {} ) >'.format(self.source, self.current)
+        representation = ' < Hydra instance at: {}, current: ( {} ) >'.format(self.source, self._file(self.current))
 
         return representation
 
