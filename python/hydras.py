@@ -615,20 +615,23 @@ class Hydra(Core):
         return blueprint
 
     def _differ(self, first, second):
-        """Calculate the percent difference between two arrays.
+        """Get a list of differences between two arrays.
 
         Arguments:
             first: numpy array
             second: numpy array
 
         Returns:
-            numpy array
+            list of ( float, float ) tuples
         """
 
-        # calculate percent difference
-        percent = 100 * ((second / first) - 1)
+        # get a mask where first and sceond differ
+        mask = (first != second)
 
-        return percent
+        # collect pairs
+        pairs = [(one, two) for one, two in zip(first[mask], second[mask])]
+
+        return pairs
 
     def _excise(self, polygons, tracer):
         """Excise bad polygons from the dataset.
@@ -1644,6 +1647,22 @@ class Hydra(Core):
 
         return reference
 
+    def _relate(self, first, second):
+        """Calculate the percent difference between two arrays.
+
+        Arguments:
+            first: numpy array
+            second: numpy array
+
+        Returns:
+            numpy array
+        """
+
+        # calculate percent difference
+        percent = 100 * ((second / first) - 1)
+
+        return percent
+
     def _round(self, quantity, digits=2, up=False):
         """Round a value based on digits.
 
@@ -2278,6 +2297,9 @@ class Hydra(Core):
             None
         """
 
+        # get current path
+        current = self.current
+
         # get first path arrays
         self.ingest(path)
         arrays = {feature.name: feature.distil() for feature in self}
@@ -2285,6 +2307,9 @@ class Hydra(Core):
         # get second path arrays
         self.ingest(pathii)
         arraysii = {feature.name: feature.distil() for feature in self}
+
+        # reingest current path
+        self.ingest(current)
 
         # get collection of intersecting names
         names = set(arrays.keys()) & set(arraysii.keys())
@@ -2313,7 +2338,7 @@ class Hydra(Core):
             if differences > 0:
 
                 # calculate percent difference
-                percent = self._differ(array[mask], arrayii[mask])
+                percent = self._relate(array[mask], arrayii[mask])
 
                 # print to screen
                 formats = (name, differences, percent.min(), percent.max())
