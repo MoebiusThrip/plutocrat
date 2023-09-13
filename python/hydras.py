@@ -628,8 +628,11 @@ class Hydra(Core):
         # get a mask where first and sceond differ
         mask = (first != second)
 
+        # get pixels for differences
+        pixels = list(zip(*numpy.where(mask)))
+
         # collect pairs
-        pairs = [(one, two) for one, two in zip(first[mask], second[mask])]
+        pairs = [(pixel, one, two) for pixel, one, two in zip(pixels, first[mask], second[mask])]
 
         return pairs
 
