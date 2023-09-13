@@ -614,6 +614,22 @@ class Hydra(Core):
 
         return blueprint
 
+    def _differ(self, first, second):
+        """Calculate the percent difference between two arrays.
+
+        Arguments:
+            first: numpy array
+            second: numpy array
+
+        Returns:
+            numpy array
+        """
+
+        # calculate percent difference
+        percent = 100 * ((second / first) - 1)
+
+        return percent
+
     def _excise(self, polygons, tracer):
         """Excise bad polygons from the dataset.
 
