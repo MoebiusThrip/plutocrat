@@ -2267,6 +2267,60 @@ class Hydra(Core):
 
         return None
 
+    def contrast(self, path, pathii):
+        """Determine span of percent differences for all arrays in the collection.
+
+        Arguments:
+            path: str, pathname
+            pathii: str, pathname
+
+        Returns:
+            None
+        """
+
+        # get first path arrays
+        self.ingest(path)
+        arrays = {feature.name: feature.distil() for feature in self}
+
+        # get second path arrays
+        self.ingest(pathii)
+        arraysii = {feature.name: feature.distil() for feature in self}
+
+        # get collection of intersecting names
+        names = set(arrays.keys()) & set(arraysii.keys())
+        names = list(names)
+        names.sort()
+
+        # print
+        self._print('')
+        self._print('contrasting {} with {}:'.format(self._file(path, 1), self._file(pathii, 1)))
+        self._print('')
+
+        # for each name
+        for name in names:
+
+            # get arrays
+            array = arrays[name]
+            arrayii = arraysii[name]
+
+            # make mask for finites
+            mask = (numpy.isfinite(array)) & (numpy.isfinite(arrayii))
+
+            # get number of differences
+            differences = (array[mask] != arrayii[mask]).sum()
+
+            # if there are differences
+            if differences > 0:
+
+                # calculate percent difference
+                percent = self._differ(array[mask], arrayii[mask])
+
+                # print to screen
+                formats = (name, differences, percent.min(), percent.max())
+                self._print('{}: {} differences, {} % to {} %'.format(*formats))
+
+        return None
+
     def dig(self, search, reference=None):
         """Dig for features with specific members in their route.
 
