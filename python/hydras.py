@@ -893,6 +893,9 @@ class Hydra(Core):
                         attributes.update({'name': info.name, 'size': info.size, 'group': info.group().name})
                         attributes.update({'isunlimited': info.isunlimited()})
 
+                        # add net attribute
+                        attributes.update({'net': True})
+
                         # add entry to collection
                         parameters = {'route': route + [field, dimension], 'shape': (info.size,), 'path': path}
                         parameters.update({'attributes': attributes, 'format': int})

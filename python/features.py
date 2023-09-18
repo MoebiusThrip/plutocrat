@@ -9,6 +9,9 @@ import pprint
 # import h5py to read h5 files
 import h5py
 
+# import netCDF
+import netCDF4
+
 
 # class Feature to represent data features
 class Feature(object):
@@ -116,8 +119,17 @@ class Feature(object):
             hdf5 file
         """
 
-        # open up the hdf5 file
-        five = h5py.File(path, 'r')
+        # if netCDF4
+        if self.attributes.get('net', False):
+
+            # fetch from netCDF4
+            five = netCDF4.Dataset(path)
+
+        # otherwise
+        else:
+
+            # open up the hdf5 file with h5py
+            five = h5py.File(path, 'r')
 
         return five
 
