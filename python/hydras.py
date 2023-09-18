@@ -104,6 +104,9 @@ class Hydra(Core):
         # default tree to None
         self.tree = None
 
+        # default net to fale for Netcdf4
+        self.net = False
+
         return
 
     def __repr__(self):
@@ -660,7 +663,7 @@ class Hydra(Core):
 
         return polygonsii, tracerii
 
-    def _fetch(self, path, net=False):
+    def _fetch(self, path):
         """Link to the contents of an hdf5 file.
 
         Arguments:
@@ -672,7 +675,7 @@ class Hydra(Core):
         """
 
         # if netCDF4
-        if net:
+        if self.net:
 
             # fetch from netCDF4
             five = netCDF4.Dataset(path)
@@ -2532,14 +2535,17 @@ class Hydra(Core):
             # replace path
             path = conversion
 
+        # set net attribute
+        self.net = net
+
         # if netcdf
-        if net:
+        if self.net:
 
             # fetch the netcdf4 file
-            with self._fetch(path, net=True) as net:
+            with self._fetch(path) as five:
 
                 # collect all features
-                features = self._garner(net, path, mode=mode, scan=scan)
+                features = self._garner(five, path, mode=mode, scan=scan)
                 self._populate(features, discard=discard)
 
         # otherwise
