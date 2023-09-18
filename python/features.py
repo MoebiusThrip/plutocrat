@@ -120,7 +120,7 @@ class Feature(object):
         """
 
         # if netCDF4
-        if self.attributes.get('net', False):
+        if self.attributes.get('netCDF', False):
 
             # fetch from netCDF4
             five = netCDF4.Dataset(path)
@@ -474,17 +474,20 @@ class Feature(object):
         factor = self.attributes.get('scale_factor', 1)
         offset = self.attributes.get('add_offset', 0)
 
-        # try to
-        try:
+        # if not a netcdf situation
+        if not self.attributes.get('netCDF', False):
 
-            # apply factors
-            array = (array * factor) + offset
+            # try to
+            try:
 
-        # unless a string
-        except TypeError:
+                # apply factors
+                array = (array * factor) + offset
 
-            # print
-            pass
+            # unless a string
+            except TypeError:
+
+                # print
+                pass
 
         return array
 
