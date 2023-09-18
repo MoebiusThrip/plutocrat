@@ -2958,7 +2958,7 @@ class Hydra(Core):
 
         return None
 
-    def net(self, path):
+    def nether(self, path):
         """Open a file with netcdf4.
 
         Arguments:
