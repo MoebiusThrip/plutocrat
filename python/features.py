@@ -237,7 +237,7 @@ class Feature(object):
         """
 
         # get dictionary representation
-        dictionary = self.__dict__
+        dictionary = self.__dict__.copy()
 
         # alter array to min and max, shape
         array = dictionary['data']
