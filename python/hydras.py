@@ -36,6 +36,9 @@ from collections import Counter
 import numpy
 import math
 
+# add warnings module
+import warnings
+
 # import netcdf4
 import netCDF4
 
@@ -1656,21 +1659,28 @@ class Hydra(Core):
 
         return reference
 
-    def _relate(self, first, second):
+    def _relate(self, first, second, difference=False):
         """Calculate the percent difference between two arrays.
 
         Arguments:
             first: numpy array
             second: numpy array
+            difference: boolean, compute difference instead of percent difference?
 
         Returns:
             numpy array
         """
 
         # calculate percent difference
-        percent = 100 * ((second / first) - 1)
+        relation = 100 * ((second / first) - 1)
 
-        return percent
+        # if difference
+        if difference:
+
+            # calculate difference
+            relation = second - first
+
+        return relation
 
     def _round(self, quantity, digits=2, up=False):
         """Round a value based on digits.
@@ -2295,16 +2305,23 @@ class Hydra(Core):
 
         return None
 
-    def contrast(self, path, pathii):
+    def contrast(self, path, pathii, difference=False):
         """Determine span of percent differences for all arrays in the collection.
 
         Arguments:
             path: str, pathname
             pathii: str, pathname
+            difference: boolean, use difference instead of percent?
 
         Returns:
             None
         """
+
+        # silencr runtime warnings
+        warnings.filterwarnings("ignore", category=RuntimeWarning)
+
+        # set symbols depending on percent or difference
+        symbols = {False: '%', True: ''}
 
         # get current path
         current = self.current
@@ -2337,21 +2354,52 @@ class Hydra(Core):
             array = arrays[name]
             arrayii = arraysii[name]
 
-            # make mask for finites
-            mask = (numpy.isfinite(array)) & (numpy.isfinite(arrayii))
+            # try to
+            try:
 
-            # get number of differences
-            differences = (array[mask] != arrayii[mask]).sum()
+                # make mask for finites
+                mask = (numpy.isfinite(array)) & (numpy.isfinite(arrayii))
 
-            # if there are differences
-            if differences > 0:
+                # get number of differences
+                differences = (array[mask] != arrayii[mask]).sum()
 
-                # calculate percent difference
-                percent = self._relate(array[mask], arrayii[mask])
+                # if there are differences
+                if differences > 0:
 
-                # print to screen
-                formats = (name, differences, percent.min(), percent.max())
-                self._print('{}: {} differences, {} % to {} %'.format(*formats))
+                    # calculate percent difference
+                    relation = self._relate(array[mask], arrayii[mask], difference)
+
+                    # get mask for finite relations
+                    maskii = numpy.isfinite(relation)
+
+                    # set formats
+                    formats = [name, differences, maskii.sum(), numpy.prod(array.shape)]
+
+                    # if there are entrei
+                    if maskii.sum() > 0:
+
+                        # add formats
+                        formats += [self._round(relation[maskii].min(), 4), symbols[difference]]
+                        formats += [self._round(relation[maskii].max(), 4), symbols[difference]]
+
+                    # otherwise
+                    else:
+
+                        # add formats
+                        formats += ['NA', symbols[difference]]
+                        formats += ['NA', symbols[difference]]
+
+                    # print to screen
+                    self._print('{}: {} differences, ({} / {}), {} {} to {} {}'.format(*formats))
+
+            # unless an error
+            except TypeError:
+
+                # pass
+                pass
+
+        # reset warnings
+        warnings.resetwarnings()
 
         return None
 
