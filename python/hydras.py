@@ -1659,26 +1659,26 @@ class Hydra(Core):
 
         return reference
 
-    def _relate(self, first, second, difference=False):
+    def _relate(self, first, second, percent=False):
         """Calculate the percent difference between two arrays.
 
         Arguments:
             first: numpy array
             second: numpy array
-            difference: boolean, compute difference instead of percent difference?
+            percent: boolean, compute percent difference instead of differecnce?
 
         Returns:
             numpy array
         """
 
-        # calculate percent difference
-        relation = 100 * ((second / first) - 1)
+        # calculate difference
+        relation = second - first
 
         # if difference
-        if difference:
+        if percent:
 
             # calculate difference
-            relation = second - first
+            relation = 100 * ((second / first) - 1)
 
         return relation
 
@@ -2305,13 +2305,13 @@ class Hydra(Core):
 
         return None
 
-    def contrast(self, path, pathii, difference=False):
+    def contrast(self, path, pathii, percent=False):
         """Determine span of percent differences for all arrays in the collection.
 
         Arguments:
             path: str, pathname
             pathii: str, pathname
-            difference: boolean, use difference instead of percent?
+            percent: boolean, use percent difference instead?
 
         Returns:
             None
@@ -2321,7 +2321,7 @@ class Hydra(Core):
         warnings.filterwarnings("ignore", category=RuntimeWarning)
 
         # set symbols depending on percent or difference
-        symbols = {False: '%', True: ''}
+        symbols = {False: '', True: '%'}
 
         # get current path
         current = self.current
@@ -2367,7 +2367,7 @@ class Hydra(Core):
                 if differences > 0:
 
                     # calculate percent difference
-                    relation = self._relate(array[mask], arrayii[mask], difference)
+                    relation = self._relate(array[mask], arrayii[mask], percent)
 
                     # get mask for finite relations
                     maskii = numpy.isfinite(relation)
@@ -2379,15 +2379,15 @@ class Hydra(Core):
                     if maskii.sum() > 0:
 
                         # add formats
-                        formats += [self._round(relation[maskii].min(), 4), symbols[difference]]
-                        formats += [self._round(relation[maskii].max(), 4), symbols[difference]]
+                        formats += [self._round(relation[maskii].min(), 4), symbols[percent]]
+                        formats += [self._round(relation[maskii].max(), 4), symbols[percent]]
 
                     # otherwise
                     else:
 
                         # add formats
-                        formats += ['NA', symbols[difference]]
-                        formats += ['NA', symbols[difference]]
+                        formats += ['NA', symbols[percent]]
+                        formats += ['NA', symbols[percent]]
 
                     # print to screen
                     self._print('{}: {} differences, ({} / {}), {} {} to {} {}'.format(*formats))
