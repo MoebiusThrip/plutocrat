@@ -2004,6 +2004,27 @@ class Hydra(Core):
 
         return subset
 
+    def _unite(self, bits):
+        """Recombine a list of bits into a decimal.
+
+        Arguments:
+            bits: list of ints, the bit flags
+
+        Returns:
+            int
+        """
+
+        # default combination to 0
+        combination = 0
+
+        # for each bit
+        for bit in bits:
+
+            # add 2 to the power of the bit
+            combination += 2 ** bit
+
+        return combination
+
     def _view(self, data, pixel=None, fields=None):
         """Print list of data shapes from a dataset.
 
