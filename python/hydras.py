@@ -2121,11 +2121,25 @@ class Hydra(Core):
 
         # for each attribute
         globals = {}
-        for name, contents in five.attrs.items():
 
-            # print
-            globals[name] = contents
-            # self._print('{}: {}'.format(name, contents))
+        # if netcdf is flals
+        if not self.net:
+
+            # get attributes
+            for name, contents in five.attrs.items():
+
+                # print
+                globals[name] = contents
+                # self._print('{}: {}'.format(name, contents))
+
+        # if netcdf
+        if self.net:
+
+            # get attributes
+            for name in five.ncattrs():
+
+                # print
+                globals[name] = five.getncattr(name)
 
         # try to
         try:
