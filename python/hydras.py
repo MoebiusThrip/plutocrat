@@ -2004,11 +2004,11 @@ class Hydra(Core):
 
         return subset
 
-    def _unite(self, bits):
+    def _unite(self, *bits):
         """Recombine a list of bits into a decimal.
 
         Arguments:
-            bits: list of ints, the bit flags
+            *bits: list of ints, the bit flags
 
         Returns:
             int
