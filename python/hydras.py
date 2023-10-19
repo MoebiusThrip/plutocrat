@@ -1889,6 +1889,39 @@ class Hydra(Core):
 
         return code
 
+    def _seek(self, group, names=None):
+        """Seek nested metadata attributes in a netcdf group.
+
+        Arguments:
+            group: netCDF group
+            names: list of previous groups
+
+        Returns:
+            None
+        """
+
+        # set default names
+        names = names or []
+
+        # print name
+        self._print('')
+        self._print('{}: '.format('/'.join(names)))
+
+        # get all attributes
+        attributes = group.ncattrs()
+
+        # for each attribute
+        [self._print(attribute, group.getncattr(attribute)) for attribute in attributes]
+
+        # get all nested gruops
+        groups = group.groups
+        for key in groups.keys():
+
+            # check next level
+            self._seek(group[key], names + [key])
+
+        return None
+
     def _serpentize(self, name):
         """Make a camel case name into snake case.
 
@@ -3117,6 +3150,24 @@ class Hydra(Core):
 
         # register
         self._register()
+
+        return None
+
+    def scrounge(self, path):
+        """Dig up the nested metadata fields and attributes.
+
+        Arguments:
+            path: str, filepath
+
+        Returns:
+            None
+        """
+
+        # create netcdf4 interface
+        with self.nether(path) as net:
+
+            # scrounge for all metadata
+            self._seek(net)
 
         return None
 
