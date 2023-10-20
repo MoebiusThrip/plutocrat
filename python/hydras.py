@@ -1911,7 +1911,7 @@ class Hydra(Core):
         attributes = group.ncattrs()
 
         # for each attribute
-        [self._print(attribute, group.getncattr(attribute)) for attribute in attributes]
+        [self._print('{}: {}'.format(attribute, group.getncattr(attribute))) for attribute in attributes]
 
         # get all nested gruops
         groups = group.groups
