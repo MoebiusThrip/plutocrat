@@ -293,12 +293,13 @@ class Plutocrat(Core):
 
         return plutino
 
-    def _supply(self, row, plutons):
+    def _supply(self, row, plutons, mode=False):
         """Mine the statement entry and add to the records.
 
         Arguments:
             row: list of str
             plutons: dict of plutons
+            mode: boolean, new exported style?
 
         Returns:
             None
@@ -310,8 +311,21 @@ class Plutocrat(Core):
         # set account to citi
         account = 'cafcu'
 
-        # unpack row
-        date, description, comments, check, amount, balance = row
+        # if not mode
+        if not mode:
+
+            # unpack row
+            date, description, comments, check, amount, balance = row
+
+        # if mode is true
+        if mode:
+
+            # unpack differently
+            _, date, _, _, amount, check, _, description, _, _, balance, _, comments = row
+
+            # replace hyphens
+            comments = comments.replace('\u2013', '-')
+            description = description.replace('\u2013', '-')
 
         # construct date from stamp
         month, day, year = date.split('/')
@@ -391,6 +405,13 @@ class Plutocrat(Core):
         paths = self._see('../banks')
         for path in paths:
 
+            # check for new format mode
+            mode = False
+            if 'ExportedTransactions' in path:
+
+                # set mode to True
+                mode = True
+
             # load up the csv
             rows = self._tape(path)
 
@@ -398,7 +419,7 @@ class Plutocrat(Core):
             for row in rows[1:]:
 
                 # mine the row
-                plutinos.append(self._supply(row, plutons))
+                plutinos.append(self._supply(row, plutons, mode=mode))
 
             # resave plutons
             self._dump(plutons, '../output/plutons.json')
