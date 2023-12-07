@@ -2139,11 +2139,12 @@ class Hydra(Core):
 
         return survivors
 
-    def attribute(self, five=None):
+    def attribute(self, five=None, look=True):
         """Print global file attributes.
 
         Arguments:
             five: hdf five object
+            look: boolean, print to screen?
 
         Returns:
             None
@@ -2185,6 +2186,12 @@ class Hydra(Core):
 
             # skip
             pass
+
+        # if look option
+        if look:
+
+            # print to screen
+            self._look(globals, 3)
 
         return globals
 
@@ -2520,6 +2527,33 @@ class Hydra(Core):
         treasure.sort(key=lambda feature: feature.name == term, reverse=True)
 
         return treasure
+
+    def extract(self, addresses=False):
+        """Extract all data arrays into a dictionary.
+
+        Arguments:
+            addresses: boolean, use full addresses?
+
+        Return:
+            dict of data arrays
+        """
+
+        # begin data
+        data = {}
+
+        # if addresses selected
+        if addresses:
+
+            # make data from addresses
+            data.update({feature.slash: feature.distil() for feature in self})
+
+        # otherwise
+        else:
+
+            # use names
+            data.update({feature.name: feature.distil() for feature in self})
+
+        return data
 
     def gist(self, pixel=None, address=False):
         """Summarize data in the file.
