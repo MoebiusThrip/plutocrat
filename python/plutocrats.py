@@ -253,7 +253,7 @@ class Plutocrat(Core):
 
         # construct date from stamp
         month, day, year = date.split('/')
-        date = '{}-{}-{}'.format(year, month, day)
+        date = '{}-{}-{}'.format(year, self._pad(month), self._pad(day))
 
         # construct quantity
         quantity = -(float(credit or 0.0) + float(debit or 0.0))
@@ -329,7 +329,7 @@ class Plutocrat(Core):
 
         # construct date from stamp
         month, day, year = date.split('/')
-        date = '{}-{}-{}'.format(year, month, day)
+        date = '{}-{}-{}'.format(year, self._pad(month), self._pad(day))
 
         # construct quantity
         quantity = float(amount.replace('$', '').replace(',', ''))
