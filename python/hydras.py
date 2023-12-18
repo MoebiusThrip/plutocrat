@@ -2647,14 +2647,14 @@ class Hydra(Core):
             self
         """
 
-        # if path is a digit
-        if str(path).isdigit():
+        # assume path is an integer
+        try:
 
-            # set path
+            # in which case set path
             path = self.paths[path]
 
-        # otherwise
-        else:
+        # unless not an integer
+        except TypeError:
 
             # look for keyword
             paths = [entry for entry in self.paths if path in entry]
