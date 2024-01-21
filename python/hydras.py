@@ -60,6 +60,9 @@ except (ImportError, SystemError):
     # in which case, nevermind
     pass
 
+# import random forest
+from sklearn.ensemble import RandomForestRegressor, RandomForestClassifier
+
 
 # class Hydra to parse hdf files
 class Hydra(Core):
@@ -1041,6 +1044,55 @@ class Hydra(Core):
                     pass
 
         return collection
+
+    def _grow(self, level=0, destination=None, subset=None):
+        """Make a tree of the file contents of an h5 file, to a certain level.
+
+        Arguments:
+            level=2: the max nesting level to see
+            destination: str, file path for destination
+            subset: str, slashed field list
+
+        Returns:
+            None
+        """
+
+        # begin tree
+        tree = {}
+
+        # for each feature
+        for feature in self:
+
+            # decompose slash
+            slash = feature.slash.split('/')
+
+            # for all but the last
+            branch = tree
+            for member in slash[:-1]:
+
+                # move to next member
+                branch.setdefault(member, {})
+                branch = branch[member]
+
+            # at last entry, add shape
+            branch[feature.name] = feature.shape
+
+        # if a subset is given
+        if subset:
+
+            # for each member
+            for field in subset.split('/'):
+
+                # subset the tree
+                tree = tree[field]
+
+        # crete tree
+        self._look(tree, level, destination)
+
+        # set tree
+        self.tree = tree
+
+        return None
 
     def _insert(self, array, destination, name, category):
         """Insert a feature into an hdf4 file.
@@ -2139,6 +2191,89 @@ class Hydra(Core):
 
         return survivors
 
+    def assemble(self, paths, three=True):
+        """Assemble data from all paths into a dataset.
+
+        Arguments:
+            paths: list of str, filepaths
+            three: boolean, include three dimensions?
+
+        Returns:
+            dict
+        """
+
+        # get current file for later
+        current = self.current
+
+        # begin data
+        data = {}
+
+        # for each path
+        for path in paths:
+
+            # ingest the data
+            self.ingest(path)
+
+            # get a counter for the shapes
+            counter = list(Counter([feature.shape for feature in self if len(feature.shape) == 2]).items())
+            counter.sort(key=lambda pair: pair[1], reverse=True)
+            shape = counter[0][0]
+
+            # get all 2-D feature names
+            names = [feature.name for feature in self if feature.shape == shape]
+
+            # set all data names to empty list
+            data.update({name: data.setdefault(name, []) for name in names})
+
+            # append all new data
+            [data[name].append(self.grab(name)) for name in names]
+
+            # if adding 3-D data
+            if three:
+
+                # get all 3-D feature names
+                threes = [feature for feature in self if len(feature.shape) == 3]
+                names = [feature.name for feature in threes if feature.shape[:2] == shape]
+
+                # for each name
+                for name in names:
+
+                    # grab array
+                    array = self.grab(name)
+                    size = array.shape[2]
+
+                    # for each position
+                    for position in range(size):
+
+                        # construct new name
+                        nameii = '{}_{}'.format(name, self._pad(position))
+
+                        # set all 3-D names to empty list
+                        data.update({nameii: data.setdefault(nameii, [])})
+
+                        # append all new data
+                        data[nameii].append(array[:, :, position])
+
+            # add rows and scanlines
+            data.update({name: data.setdefault(name, []) for name in ('row', 'scan')})
+
+            # create row and scan matrices
+            row = numpy.array([list(range(shape[1]))] * shape[0])
+            scan = numpy.array([list(range(shape[0]))] * shape[1]).transpose(1, 0)
+            data['row'].append(row)
+            data['scan'].append(scan)
+
+        # concatenate all arrays
+        data = {name: numpy.vstack(arrays) for name, arrays in data.items()}
+
+        # if current is not blank
+        if current:
+
+            # reingest current file
+            self.ingest(current)
+
+        return data
+
     def attribute(self, five=None, look=True):
         """Print global file attributes.
 
@@ -3123,52 +3258,71 @@ class Hydra(Core):
 
         return net
 
-    def plant(self, level=0, destination=None, subset=None):
-        """Make a tree of the file contents of an h5 file, to a certain level.
+    def plant(self, data, target, destination, header=None, classify=True):
+        """Use random forest to predict target value from data
 
         Arguments:
-            level=2: the max nesting level to see
-            destination: str, file path for destination
-            subset: str, slashed field list
+            data: dict of str, numpy array
+            target: str, name of target variable
+            destination: str, pathname for destination
+            header: header for report
+            classify: boolean, use classifier?
 
         Returns:
             None
         """
 
-        # begin tree
-        tree = {}
+        # assemble matrix
+        names = [name for name in data.keys() if name != target] + [target]
+        train = numpy.array([data[name].flatten() for name in names]).transpose(1, 0)
 
-        # for each feature
-        for feature in self:
+        # split off truth
+        matrix = train[:, :-1]
+        truth = train[:, -1]
 
-            # decompose slash
-            slash = feature.slash.split('/')
+        # begin report
+        report = header or ['Random forest for {}'.format(target)]
+        report.append('')
 
-            # for all but the last
-            branch = tree
-            for member in slash[:-1]:
+        # if classifier
+        if classify:
 
-                # move to next member
-                branch.setdefault(member, {})
-                branch = branch[member]
+            # run random forest
+            self._stamp('running random forest for {}...'.format(target), initial=True)
+            self._print('matrix: {}'.format(matrix.shape))
+            forest = RandomForestClassifier(n_estimators=100, max_depth=5)
+            forest.fit(matrix, truth)
 
-            # at last entry, add shape
-            branch[feature.name] = feature.shape
+        # otherwise
+        else:
 
-        # if a subset is given
-        if subset:
+            # run random forest
+            self._stamp('running random forest for {}...'.format(target), initial=True)
+            self._print('matrix: {}'.format(matrix.shape))
+            forest = RandomForestRegressor(n_estimators=100, max_depth=5)
+            forest.fit(matrix, truth)
 
-            # for each member
-            for field in subset.split('/'):
+        # predict from training
+        prediction = forest.predict(matrix)
 
-                # subset the tree
-                tree = tree[field]
+        # calculate score
+        score = forest.score(matrix, truth)
+        report.append(self._print('score: {}'.format(score)))
 
-        # crete tree
-        self._look(tree, level, destination)
+        # get importances
+        importances = forest.feature_importances_
+        pairs = [(field, importance) for field, importance in zip(names, importances)]
+        pairs.sort(key=lambda pair: pair[1], reverse=True)
+        for field, importance in pairs:
 
-        # set tree
-        self.tree = tree
+            # add to report
+            report.append(self._print('importance for {}: {}'.format(field, importance)))
+
+        # make report
+        self._jot(report, destination)
+
+        # print status
+        self._stamp('planted.')
 
         return None
 
