@@ -3341,7 +3341,7 @@ class Hydra(Core):
 
         return None
 
-    def scrounge(self, path):
+    def scrounge(self, path=None):
         """Dig up the nested metadata fields and attributes.
 
         Arguments:
@@ -3350,6 +3350,9 @@ class Hydra(Core):
         Returns:
             None
         """
+
+        # set path to current by default
+        path = path or self.current
 
         # create netcdf4 interface
         with self.nether(path) as net:
