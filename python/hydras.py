@@ -2600,7 +2600,7 @@ class Hydra(Core):
                         formats += ['NA', symbols[percent]]
 
                     # print to screen
-                    self._print('{}: {} differences, ({} / {}), {} {} to {} {}'.format(*formats))
+                    self._print('{}: ( {} ) differences, ({} / {}), {} {} to {} {}'.format(*formats))
 
             # unless an error
             except TypeError:
