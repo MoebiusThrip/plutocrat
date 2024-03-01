@@ -2756,11 +2756,23 @@ class Hydra(Core):
             list of dicts
         """
 
+        # default array
+        array = None
+
         # dig up features
         features = self.dig(search, reference)
 
-        # get the first
-        array = features[index].distil()
+        # try to
+        try:
+
+            # get the first
+            array = features[index].distil()
+
+        # unless nothing found
+        except IndexError:
+
+            # print alert
+            self._print('{} came up empty!'.format(search))
 
         return array
 
