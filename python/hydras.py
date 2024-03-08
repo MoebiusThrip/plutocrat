@@ -3278,7 +3278,7 @@ class Hydra(Core):
 
         return net
 
-    def plant(self, data, target, destination, masking=False, header=None, classify=False):
+    def plant(self, data, target, destination, masking=True, header=None, classify=False):
         """Use random forest to predict target value from data
 
         Arguments:
