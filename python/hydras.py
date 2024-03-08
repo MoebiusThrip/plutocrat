@@ -2663,10 +2663,11 @@ class Hydra(Core):
 
         return treasure
 
-    def extract(self, addresses=False):
+    def extract(self, reference=None, addresses=False):
         """Extract all data arrays into a dictionary.
 
         Arguments:
+            reference: reference array with which to match shapes
             addresses: boolean, use full addresses?
 
         Return:
@@ -2687,6 +2688,13 @@ class Hydra(Core):
 
             # use names
             data.update({feature.name: feature.distil() for feature in self})
+
+        # if reference given
+        if reference:
+
+            # screen for shape
+            shape = data[reference].shape
+            data = {name: array for name, array in data.items() if array.shape == shape}
 
         return data
 
@@ -3270,19 +3278,48 @@ class Hydra(Core):
 
         return net
 
-    def plant(self, data, target, destination, header=None, classify=True):
+    def plant(self, data, target, destination, masking=False, header=None, classify=False):
         """Use random forest to predict target value from data
 
         Arguments:
             data: dict of str, numpy array
             target: str, name of target variable
             destination: str, pathname for destination
+            masking: boolean, apply nan and fill mask first?
             header: header for report
             classify: boolean, use classifier?
 
         Returns:
             None
         """
+
+        # begin report
+        report = header or ['Random forest for {}'.format(target)]
+        report.append('')
+
+        # if masking:
+        if masking:
+
+            # set fills
+            fill = -999
+            fillii = 1e20
+
+            # get valid data mask
+            masks = [(array > fill) & (abs(array) < fillii) & numpy.isfinite(array) for array in data.values()]
+
+            # multiply all masks
+            masque = masks[0]
+            for mask in masks[1:]:
+                # use logical and
+                masque = numpy.logical_and(masque, mask)
+
+            # check masked quantity
+            masked = masque.sum()
+            total = numpy.prod(masque.shape)
+            report.append(self._print('masque: {} of {}, {} %'.format(masked, total, 100 * masked / total)))
+
+            # apply masque
+            data = {name: array[masque] for name, array in data.items()}
 
         # assemble matrix
         names = [name for name in data.keys() if name != target] + [target]
@@ -3291,10 +3328,6 @@ class Hydra(Core):
         # split off truth
         matrix = train[:, :-1]
         truth = train[:, -1]
-
-        # begin report
-        report = header or ['Random forest for {}'.format(target)]
-        report.append('')
 
         # if classifier
         if classify:
