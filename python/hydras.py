@@ -3304,18 +3304,19 @@ class Hydra(Core):
 
         return None
 
-    def nether(self, path):
+    def nether(self, path, mode='r'):
         """Open a file with netcdf4.
 
         Arguments:
             path: str, filepath
+            mode: 'r' for read or 'r+' for read and write, 'a' for append, or 'w' for write
 
         Returns:
             netCDF4 Dataset
         """
 
         # open with netCDF4
-        net = netCDF4.Dataset(path)
+        net = netCDF4.Dataset(path, mode=mode)
 
         return net
 
