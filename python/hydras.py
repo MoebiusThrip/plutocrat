@@ -3107,6 +3107,29 @@ class Hydra(Core):
 
         return None
 
+    def meditate(self, string):
+        """Parse a metadata string into text.
+
+        Arguments:
+            string: str, metadata string
+
+        Returns:
+            list of str
+        """
+
+        # get lines
+        lines = string.split('\\n')
+
+        # get key words
+        words = ['OBJECT', 'PARAMETER', 'VALUE', 'GROUP', 'CLASS', 'NUM_VAL']
+        exclusions = ['END_OBJECT', 'END_GROUP']
+
+        # filter
+        lines = [line for line in lines if not any([word in line for word in exclusions])]
+        lines = [line for line in lines if any([word in line for word in words])]
+
+        return lines
+
     def merge(self, paths, destination, lead=False):
         """Merge together several congruent hdf5 files in order
 
