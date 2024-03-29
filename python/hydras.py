@@ -3122,6 +3122,7 @@ class Hydra(Core):
 
         # get key words
         words = ['OBJECT', 'PARAMETER', 'VALUE', 'GROUP', 'CLASS', 'NUM_VAL']
+        words += ['FieldName', 'DataType', 'DimList']
         exclusions = ['END_OBJECT', 'END_GROUP']
 
         # filter
