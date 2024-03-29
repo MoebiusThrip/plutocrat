@@ -3120,6 +3120,9 @@ class Hydra(Core):
         # get lines
         lines = string.split('\\n')
 
+        # strip tabls
+        lines = [line.strip('\\t') for line in lines]
+
         # get key words
         words = ['OBJECT', 'PARAMETER', 'VALUE', 'GROUP', 'CLASS', 'NUM_VAL']
         words += ['FieldName', 'DataType', 'DimList']
