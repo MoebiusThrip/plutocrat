@@ -3134,13 +3134,14 @@ class Hydra(Core):
 
         return lines
 
-    def merge(self, paths, destination, lead=False):
+    def merge(self, paths, destination, lead=False, squeeze=False):
         """Merge together several congruent hdf5 files in order
 
         Arguments:
             paths: list of str
             destination: str
             lead: boolean, add new dimension?
+            squeeze: boolean, squeeze out trivial dimensions?
 
         Returns:
             None
@@ -3243,6 +3244,12 @@ class Hydra(Core):
 
                         # zero out feature
                         self._print('no entry for: {}, skipping...'.format(feature.name))
+
+                    # if squeeze
+                    if squeeze:
+
+                        # squeeze array
+                        feature.instil(feature.distil().squeeze())
 
         # add link conditions
         #[feature.update({'link': True}) for feature in features if 'Categories' in feature.slash]
