@@ -1154,6 +1154,21 @@ class Hydra(Core):
 
         return None
 
+    def _mask(self, mask):
+        """Retrieve pixels from a mask.
+
+        Arguments:
+            mask: numpy.array boolean mask
+
+        Returns:
+            list of tuples, the pixels
+        """
+
+        # get pixels
+        pixels = self._pin(1, mask.astype(int), mask.sum())
+
+        return pixels
+
     def _orient(self, degrees, east=False):
         """Construct an oriented latitude or longitude tag from a signed decimal.
 
