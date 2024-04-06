@@ -2669,6 +2669,40 @@ class Hydra(Core):
 
         return correlation
 
+    def differ(self, first, second, reference=None):
+        """Construct a dataset of differences between two files.
+
+        Arguments:
+            first: str, path of first file
+            second: str, path of second file
+            reference: str, field name for shape information.
+
+        Returns:
+            dict of differences
+        """
+
+        # retrieve current
+        current = self.current
+
+        # get the first dataset
+        self.ingest(first)
+        data = self.extract(reference)
+
+        # get the second dataset
+        self.ingest(second)
+        dataii = self.extract(reference)
+
+        # create differences
+        differences = {name: dataii[name] - data[name] for name in data.keys()}
+
+        # if current is valid
+        if current:
+
+            # reingest
+            self.ingest(current)
+
+        return differences
+
     def dig(self, search, reference=None):
         """Dig for features with specific members in their route.
 
