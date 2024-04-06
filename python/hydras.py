@@ -2692,8 +2692,22 @@ class Hydra(Core):
         self.ingest(second)
         dataii = self.extract(reference)
 
-        # create differences
-        differences = {name: dataii[name] - data[name] for name in data.keys()}
+        # begin differences
+        differences = {}
+        for name in data.keys():
+
+            # try to
+            try:
+
+                # subtract and add to collection
+                difference = dataii[name] - data[name]
+                differences[name] = difference
+
+            # unless wrong type
+            except TypeError:
+
+                # alert pass
+                self._print('unable to subtract {}'.format(name))
 
         # if current is valid
         if current:
