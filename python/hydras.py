@@ -3417,7 +3417,7 @@ class Hydra(Core):
 
         return net
 
-    def plant(self, data, target, destination, masking=True, header=None, classify=False):
+    def plant(self, data, target, destination, masking=True, header=None, classify=False, give=False):
         """Use random forest to predict target value from data
 
         Arguments:
@@ -3427,6 +3427,7 @@ class Hydra(Core):
             masking: boolean, apply nan and fill mask first?
             header: header for report
             classify: boolean, use classifier?
+            give: boolean, return forest as output?
 
         Returns:
             None
@@ -3508,7 +3509,14 @@ class Hydra(Core):
         # print status
         self._stamp('planted.')
 
-        return None
+        # if giving output
+        package = None
+        if give:
+
+            # set package to tree
+            package = forest
+
+        return package
 
     def renew(self):
         """Renew the file list.
