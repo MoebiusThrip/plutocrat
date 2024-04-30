@@ -72,7 +72,7 @@ class Hydra(Core):
         cores.Core
     """
 
-    def __init__(self, source='', start='', finish=''):
+    def __init__(self, source='', start='', finish='', show=True):
         """Initialize a Hydra instance.
 
         Arguments:
@@ -80,6 +80,7 @@ class Hydra(Core):
             source: str, filepath of source files
             start: str, date-based subdirectory
             finish: str, date-based subdirectory
+            show: boolean, show paths on screen print
 
         Returns:
             None
@@ -94,7 +95,10 @@ class Hydra(Core):
         self.finish = finish
 
         # set accepted file extensions
-        self.extensions = ('.nc', '.he4', '.h5', '.nc4', '.he5', '.met')
+        self.extensions = ('.nc', '.he4', '.h5', '.nc4', '.he5')
+
+        # set show boolean, for display paths
+        self.show = show
 
         # gather all relevant paths
         self.paths = []
@@ -125,8 +129,11 @@ class Hydra(Core):
             str
         """
 
-        # display contents
-        self._tell(self.paths)
+        # if show
+        if self.show:
+
+            # display contents
+            self._tell(self.paths)
 
         # create representation
         representation = ' < Hydra instance at: {}, current: ( {} ) >'.format(self.source, self._file(self.current))
@@ -1672,9 +1679,12 @@ class Hydra(Core):
         paths = [path for path in paths if any([path.endswith(extension) for extension in self.extensions])]
         paths.sort()
 
-        # print paths
-        self._tell(paths)
-        self._print('{} paths collected.\n'.format(len(paths)))
+        # if showing paths
+        if self.show:
+
+            # print paths
+            self._tell(paths)
+            self._print('{} paths collected.\n'.format(len(paths)))
 
         # set attribute
         self.paths = paths
