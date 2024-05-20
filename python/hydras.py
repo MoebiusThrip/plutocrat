@@ -2171,7 +2171,10 @@ class Hydra(Core):
                     else:
 
                         # print each one
-                        self._print(name, array.shape, '{} to {}'.format(array.min(), array.max()))
+                        fill = array.min()
+                        minimum = array[array > -900].min()
+                        maximum = array.max()
+                        self._print(name, array.shape, '{} to {} to {}'.format(fill, minimum, maximum))
 
                 # unless error
                 except (ValueError, IndexError, TypeError):
