@@ -72,7 +72,7 @@ class Hydra(Core):
         cores.Core
     """
 
-    def __init__(self, source='', start='', finish='', show=True):
+    def __init__(self, source='', start='', finish='', extensions=None, show=True):
         """Initialize a Hydra instance.
 
         Arguments:
@@ -80,6 +80,7 @@ class Hydra(Core):
             source: str, filepath of source files
             start: str, date-based subdirectory
             finish: str, date-based subdirectory
+            extensions: list of str, extra extensions
             show: boolean, show paths on screen print
 
         Returns:
@@ -95,7 +96,7 @@ class Hydra(Core):
         self.finish = finish
 
         # set accepted file extensions
-        self.extensions = ('.nc', '.he4', '.h5', '.nc4', '.he5')
+        self.extensions = extensions or ('.nc', '.he4', '.h5', '.nc4', '.he5')
 
         # set show boolean, for display paths
         self.show = show
