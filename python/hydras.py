@@ -654,7 +654,7 @@ class Hydra(Core):
         return pairs
 
     def _excise(self, polygons, tracer):
-        """Excise bad polygons from the dataset.
+        """Excise bad latitude and longitude polygons from the dataset.
 
         Arguments:
             polygons: numpy array
@@ -664,12 +664,14 @@ class Hydra(Core):
             tuple of numpy arrays
         """
 
-        # extract longitudes from polygons
+        # extract latitudes and longitudes from polygons
+        latitudes = polygons[:, :, :4]
         longitudes = polygons[:, :, 4:]
 
         # calculation standard deviations
-        deviation = longitudes.std(axis=2)
-        mask = (deviation < 20)
+        deviation = latitudes.std(axis=2)
+        deviationii = longitudes.std(axis=2)
+        mask = (deviation < 20) & (deviationii < 20)
 
         # apply mask
         polygonsii = polygons[mask]
@@ -3184,7 +3186,7 @@ class Hydra(Core):
 
         return None
 
-    def meditate(self, string):
+    def meditate(self, string, filter=True):
         """Parse a metadata string into text.
 
         Arguments:
@@ -3205,9 +3207,12 @@ class Hydra(Core):
         words += ['FieldName', 'DataType', 'DimList']
         exclusions = ['END_OBJECT', 'END_GROUP']
 
-        # filter
-        lines = [line for line in lines if not any([word in line for word in exclusions])]
-        lines = [line for line in lines if any([word in line for word in words])]
+        # if filtering
+        if filter:
+
+            # filter
+            lines = [line for line in lines if not any([word in line for word in exclusions])]
+            lines = [line for line in lines if any([word in line for word in words])]
 
         return lines
 
