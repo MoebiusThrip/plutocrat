@@ -2583,10 +2583,28 @@ class Hydra(Core):
         names = list(names)
         names.sort()
 
+        # get fields missing from one and not the other
+        missing = set(arrays.keys()) - set(arraysii.keys())
+        missingii = set(arraysii.keys()) - set(arrays.keys())
+
         # print
         self._print('')
         self._print('contrasting {} with {}:'.format(self._file(path, 1), self._file(pathii, 1)))
         self._print('')
+
+        # if missing fields
+        if len(missing) > 0:
+
+            # print
+            self._print('missing from {}: {}'.format(self._file(pathii, 1), missing))
+            self._print('')
+
+        # if missing fields
+        if len(missingii) > 0:
+
+            # print
+            self._print('missing from {}: {}'.format(self._file(path, 1), missingii))
+            self._print('')
 
         # for each name
         for name in names:
