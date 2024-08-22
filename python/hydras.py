@@ -1016,17 +1016,17 @@ class Hydra(Core):
                     problems = ('DIMENSION_LIST', 'REFERENCE_LIST')
                     attributes = {name: value for name, value in data.attrs.items() if name not in problems}
 
-                    # try to
-                    try:
-
-                        # add fill value property
-                        attributes['fill_property'] = data.fillvalue
-
-                    # unless not available
-                    except AttributeError:
-
-                        # skip
-                        pass
+                    # # try to
+                    # try:
+                    #
+                    #     # add fill value property
+                    #     attributes['fill_property'] = data.fillvalue
+                    #
+                    # # unless not available
+                    # except AttributeError:
+                    #
+                    #     # skip
+                    #     pass
 
                     # if the type is simple
                     if len(form) < 1:
