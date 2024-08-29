@@ -1648,7 +1648,7 @@ class Hydra(Core):
 
         # get all file paths
         paths = []
-        self._print('collecting paths...')
+        self._print('collecting paths from {}...'.format(self.source))
 
         # if a source directory is given
         if self.source:
