@@ -2185,11 +2185,35 @@ class Hydra(Core):
 
                     else:
 
+                        # create mask for valid data
+                        mask = (numpy.isfinite(array)) & (abs(array) < 1e20) & (array > -998)
+                        maskii = numpy.logical_not(mask)
+
+                        # get minimum and maximum
+                        minimum = 0
+                        maximum = 0
+                        size = mask.sum()
+                        sizeii = numpy.prod(array.shape)
+                        if size > 0:
+
+                            # get valid min and max
+                            minimum = array[mask].min()
+                            maximum = array[mask].max()
+
+                        # create fills
+                        fills = ''
+                        if maskii.sum() > 0:
+
+                            # get fills
+                            fills = numpy.unique(array[maskii])
+
+                        # create spacings
+                        space = max([0, 18 - len(str(array.shape))]) * ' '
+                        spaceii = max([0, 25 - len(name)]) * ' '
+
                         # print each one
-                        fill = array.min()
-                        minimum = array[array > -900].min()
-                        maximum = array.max()
-                        self._print(name, array.shape, '{} to {} to {}'.format(fill, minimum, maximum))
+                        formats = (array.shape, space, name, spaceii, minimum, maximum, size, sizeii, fills)
+                        self._print('{} {}{} {}{} to {} ( {} / {} ) {}'.format(*formats))
 
                 # unless error
                 except (ValueError, IndexError, TypeError):
