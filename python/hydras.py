@@ -2192,8 +2192,8 @@ class Hydra(Core):
                         # get minimum and maximum
                         minimum = 0
                         maximum = 0
-                        size = mask.sum()
-                        sizeii = numpy.prod(array.shape)
+                        size = int(mask.sum())
+                        sizeii = int(numpy.prod(array.shape))
                         if size > 0:
 
                             # get valid min and max
