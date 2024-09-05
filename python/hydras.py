@@ -3523,6 +3523,7 @@ class Hydra(Core):
             # multiply all masks
             masque = masks[0]
             for mask in masks[1:]:
+
                 # use logical and
                 masque = numpy.logical_and(masque, mask)
 
