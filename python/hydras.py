@@ -3718,7 +3718,7 @@ class Hydra(Core):
         # set attributes and dimensions reservoir
         attributes = attributes or {}
 
-        self._print('making features..')
+        self._print('making features...')
 
         # for each member
         features = []
