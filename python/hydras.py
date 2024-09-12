@@ -3742,7 +3742,7 @@ class Hydra(Core):
         else:
 
             # stash file at destination using h5py
-            self.stash(features, destination)
+            self.stash(features, destination, globals=globals)
 
         return None
 
@@ -3778,7 +3778,7 @@ class Hydra(Core):
 
         return None
 
-    def stash(self, features, destination, link=None, mode='w', compression=None, scan=False):
+    def stash(self, features, destination, link=None, mode='w', compression=None, scan=False, globals=None):
         """Stash a group of features in an hdf5 file.
 
         Arguments:
@@ -3788,6 +3788,7 @@ class Hydra(Core):
             mode: str, writemode
             compression: compression option
             scan: scan feature names?
+            globals: dict of global attributes
 
         Returns:
             None
@@ -3920,6 +3921,15 @@ class Hydra(Core):
 
                     # print error
                     self._print('skipping {}: {}'.format(feature.slash, error))
+
+        # if globals are present
+        if globals:
+
+            # for each global
+            for name, contents in globals.items():
+
+                # add to attrs
+                five.attrs[name] = contents
 
         # close hdf5 file
         five.close()
