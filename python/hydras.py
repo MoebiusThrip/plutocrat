@@ -1,27 +1,14 @@
-#!/usr/bin/env python3
 
 # hydras.py for the Hydra class to parse hdf files
 
 # import local classes
 from cores import Core
 from features import Feature
-
-# try to
-try:
-
-    # import formulas
-    from formulas import Formula
-
-# unless not avaialbe
-except ImportError:
-
-    # nevermind
-    pass
+from formulas import Formula
 
 # import general tools
 import os
 import re
-import subprocess
 import yaml
 
 # import time and datetime
@@ -36,12 +23,6 @@ from collections import Counter
 import numpy
 import math
 
-# add warnings module
-import warnings
-
-# import netcdf4
-import netCDF4
-
 # import h5py to read h5 files
 import h5py
 
@@ -52,16 +33,12 @@ try:
     from pyhdf.HDF import HDF, HDF4Error, HC
     from pyhdf.SD import SD, SDC
     from pyhdf.V import V
-    from pyhdf.error import HDF4Error
 
 # unless it is not installed
 except (ImportError, SystemError):
 
     # in which case, nevermind
     pass
-
-# import random forest
-from sklearn.ensemble import RandomForestRegressor, RandomForestClassifier
 
 
 # class Hydra to parse hdf files
@@ -72,7 +49,7 @@ class Hydra(Core):
         cores.Core
     """
 
-    def __init__(self, source='', start='', finish='', extensions=None, show=True):
+    def __init__(self, source='', start='', finish=''):
         """Initialize a Hydra instance.
 
         Arguments:
@@ -80,8 +57,6 @@ class Hydra(Core):
             source: str, filepath of source files
             start: str, date-based subdirectory
             finish: str, date-based subdirectory
-            extensions: list of str, extra extensions
-            show: boolean, show paths on screen print
 
         Returns:
             None
@@ -96,10 +71,7 @@ class Hydra(Core):
         self.finish = finish
 
         # set accepted file extensions
-        self.extensions = extensions or ('.nc', '.he4', '.h5', '.nc4', '.he5')
-
-        # set show boolean, for display paths
-        self.show = show
+        self.extensions = ('.nc', '.he4', '.h5', '.nc4', '.he5', '.met')
 
         # gather all relevant paths
         self.paths = []
@@ -109,14 +81,8 @@ class Hydra(Core):
         # reference for current features
         self.reference = {}
 
-        # reference for current file
-        self.current = ''
-
-        # default tree to None
-        self.tree = None
-
-        # default net to fale for Netcdf4
-        self.net = False
+        # allocate for tree
+        self.tree = {}
 
         return
 
@@ -130,38 +96,13 @@ class Hydra(Core):
             str
         """
 
-        # if show
-        if self.show:
-
-            # display contents
-            self._tell(self.paths)
+        # display contents
+        self._tell(self.paths)
 
         # create representation
-        representation = ' < Hydra instance at: {}, current: ( {} ) >'.format(self.source, self._file(self.current))
+        representation = ' < Hydra instance at: {} >'.format(self.source)
 
         return representation
-
-    def _bite(self, number):
-        """Determine bit flags in an integer.
-
-        Arguments:
-            number: int
-
-        Returns:
-            list of ints, the bit positions
-        """
-
-        # get binary string, removing leading 0b
-        binary = bin(int(number))[2:]
-
-        # determine length
-        length = len(binary)
-
-        # get bit positions
-        positions = [length - index - 1 for index, bit in enumerate(binary) if bit == '1']
-        positions.sort()
-
-        return positions
 
     def _cache(self, features, destination, link=None, mode='w', compression=None, scan=False):
         """Stash a group of features in an hdf4 file.
@@ -392,61 +333,6 @@ class Hydra(Core):
 
         return collection
 
-    def _compress(self, corners, trackwise, rowwise):
-        """Compress the latitude or longitude bounds based on compression factors.
-
-        Arguments:
-            corners: dict of corner arrays
-            trackwise: north-south compression factor
-            rowwise: east-west compression factor
-
-        Returns:
-            numpy array
-        """
-
-        # set directions
-        compasses = ['southwest', 'southeast', 'northeast', 'northwest']
-
-        # # for each corner
-        # for compass in compasses:
-        #
-        #     # shift negative longitudes to positive
-        #     corner = corners[compass][:, :, 1]
-        #     corners[compass][:, :, 1] = numpy.where(corner < 0, corner + 360, corner)
-
-        # get shape
-        shape = corners['southwest'].shape
-
-        # get selected trackwise indices and rowwise indices
-        selection = numpy.array([index for index in range(shape[0]) if index % trackwise == 0])
-        selectionii = numpy.array([index for index in range(shape[1]) if index % rowwise == 0])
-
-        # adjust based on factors
-        adjustment = numpy.array([min([index + trackwise - 1, shape[0] - 1]) for index in selection])
-        adjustmentii = numpy.array([min([index + rowwise - 1, shape[1] - 1]) for index in selectionii])
-
-        # begin compression
-        compression = {}
-
-        # adjust southwest
-        compression['southwest'] = corners['southwest'][selection]
-        compression['southwest'] = compression['southwest'][:, selectionii]
-        compression['southeast'] = corners['southeast'][selection]
-        compression['southeast'] = compression['southeast'][:, adjustmentii]
-        compression['northeast'] = corners['northeast'][adjustment]
-        compression['northeast'] = compression['northeast'][:, adjustmentii]
-        compression['northwest'] = corners['northwest'][adjustment]
-        compression['northwest'] = compression['northwest'][:, selectionii]
-
-        # # for each corner
-        # for compass in compasses:
-        #
-        #     # shift negative longitudes to positive
-        #     corner = compression[compass][:, :, 1]
-        #     compression[compass][:, :, 1] = numpy.where(corner >= 180, corner - 360, corner)
-
-        return compression
-
     def _convert(self, path, destination, names=None):
         """Convert an hdf4 file path to an hdf5 file.
 
@@ -470,7 +356,7 @@ class Hydra(Core):
 
         # stash as h5 file
         self._print('stashing...')
-        self.stash(features, destination)
+        self._stash(features, destination)
 
         # reopen as contents
         contents = h5py.File(destination, 'r')
@@ -479,33 +365,6 @@ class Hydra(Core):
         self._print('{} converted.'.format(path))
 
         return contents
-
-    def _cross(self, bounds):
-        """Adjust for longitude bounds that cross the dateline.
-
-        Arguments:
-            bounds: numpy array of bounds
-
-        Returns:
-            numpy array
-        """
-
-        # for each image
-        for image in range(bounds.shape[0]):
-
-            # and each row
-            for row in range(bounds.shape[1]):
-
-                # get the bounds
-                polygon = bounds[image][row]
-
-                # check for discrepancy
-                if any([(entry < -170) for entry in polygon]) and any([entry > 170 for entry in polygon]):
-
-                    # adjust bounds
-                    bounds[image][row] = numpy.where(polygon > 170, polygon, polygon + 360)
-
-        return bounds
 
     def _depopulate(self):
         """Depopulate the instance.
@@ -631,319 +490,20 @@ class Hydra(Core):
 
         return blueprint
 
-    def _differ(self, first, second):
-        """Get a list of differences between two arrays.
-
-        Arguments:
-            first: numpy array
-            second: numpy array
-
-        Returns:
-            list of ( float, float ) tuples
-        """
-
-        # get a mask where first and sceond differ
-        mask = (first != second)
-
-        # get pixels for differences
-        pixels = list(zip(*numpy.where(mask)))
-
-        # collect pairs
-        pairs = [(pixel, one, two) for pixel, one, two in zip(pixels, first[mask], second[mask])]
-
-        return pairs
-
-    def _excise(self, polygons, tracer):
-        """Excise bad latitude and longitude polygons from the dataset.
-
-        Arguments:
-            polygons: numpy array
-            tracer: numpy array
-
-        Returns:
-            tuple of numpy arrays
-        """
-
-        # extract latitudes and longitudes from polygons
-        latitudes = polygons[:, :, :4]
-        longitudes = polygons[:, :, 4:]
-
-        # calculation standard deviations
-        deviation = latitudes.std(axis=2)
-        deviationii = longitudes.std(axis=2)
-        mask = (deviation < 20) & (deviationii < 20)
-
-        # apply mask
-        polygonsii = polygons[mask]
-        tracerii = tracer[mask]
-
-        return polygonsii, tracerii
-
     def _fetch(self, path):
         """Link to the contents of an hdf5 file.
 
         Arguments:
             path: str, file path
-            net: boolean, use netcdf
 
         Returns:
             hdf5 file
         """
 
-        # if netCDF4
-        if self.net:
-
-            # fetch from netCDF4
-            five = netCDF4.Dataset(path)
-
-        # otherwise
-        else:
-
-            # open up the hdf5 file with h5py
-            five = h5py.File(path, 'r')
+        # open up the hdf5 file
+        five = h5py.File(path, 'r')
 
         return five
-
-    def _frame(self, latitude, longitude):
-        """Construct the corners of polygons from latitude and longitude coordinates.
-
-        Arguments:
-            latitude: numpy array
-            longitude: numpy array
-
-        Returns:
-            dict of numpy arrays, the corner points
-        """
-
-        # get main shape
-        shape = latitude.shape
-
-        # # adjust longitude for negative values
-        # longitude = numpy.where(longitude < 0, longitude + 360, longitude)
-
-        # initialize all four corners, with one layer for latitude and one for longitude
-        northwest = numpy.zeros((*shape, 2))
-        northeast = numpy.zeros((*shape, 2))
-        southwest = numpy.zeros((*shape, 2))
-        southeast = numpy.zeros((*shape, 2))
-
-        # create latitude frame, with one more row and image on each side
-        frame = numpy.zeros((shape[0] + 2, shape[1] + 2))
-        frame[1: shape[0] + 1, 1: shape[1] + 1] = latitude
-
-        # extend sides of frame by extrapolation
-        frame[1: -1, 0] = 2 * latitude[:, 0] - latitude[:, 1]
-        frame[1: -1, -1] = 2 * latitude[:, -1] - latitude[:, -2]
-        frame[0, 1:-1] = 2 * latitude[0, :] - latitude[1, :]
-        frame[-1, 1:-1] = 2 * latitude[-1, :] - latitude[-2, :]
-
-        # extend corners
-        frame[0, 0] = 2 * frame[1, 1] - frame[2, 2]
-        frame[0, -1] = 2 * frame[1, -2] - frame[2, -3]
-        frame[-1, 0] = 2 * frame[-2, 1] - frame[-3, 2]
-        frame[-1, -1] = 2 * frame[-2, -2] - frame[-3, -3]
-
-        # create longitude frame, with one more row and image on each side
-        frameii = numpy.zeros((shape[0] + 2, shape[1] + 2))
-        frameii[1: shape[0] + 1, 1: shape[1] + 1] = longitude
-
-        # extend sides of frame by extrapolation
-        frameii[1: -1, 0] = 2 * longitude[:, 0] - longitude[:, 1]
-        frameii[1: -1, -1] = 2 * longitude[:, -1] - longitude[:, -2]
-        frameii[0, 1:-1] = 2 * longitude[0, :] - longitude[1, :]
-        frameii[-1, 1:-1] = 2 * longitude[-1, :] - longitude[-2, :]
-
-        # extend corners
-        frameii[0, 0] = 2 * frameii[1, 1] - frameii[2, 2]
-        frameii[0, -1] = 2 * frameii[1, -2] - frameii[2, -3]
-        frameii[-1, 0] = 2 * frameii[-2, 1] - frameii[-3, 2]
-        frameii[-1, -1] = 2 * frameii[-2, -2] - frameii[-3, -3]
-
-        # populate interior polygon corners image by image
-        for image in range(0, shape[0]):
-
-            # and row by row
-            for row in range(0, shape[1]):
-
-                # frame indices are off by 1
-                imageii = image + 1
-                rowii = row + 1
-
-                # by averaging latitude frame at diagonals
-                northwest[image, row, 0] = (frame[imageii, rowii] + frame[imageii + 1][rowii - 1]) / 2
-                northeast[image, row, 0] = (frame[imageii, rowii] + frame[imageii + 1][rowii + 1]) / 2
-                southwest[image, row, 0] = (frame[imageii, rowii] + frame[imageii - 1][rowii - 1]) / 2
-                southeast[image, row, 0] = (frame[imageii, rowii] + frame[imageii - 1][rowii + 1]) / 2
-
-                # and by averaging longitude longitudes at diagonals
-                northwest[image, row, 1] = (frameii[imageii, rowii] + frameii[imageii + 1][rowii - 1]) / 2
-                northeast[image, row, 1] = (frameii[imageii, rowii] + frameii[imageii + 1][rowii + 1]) / 2
-                southwest[image, row, 1] = (frameii[imageii, rowii] + frameii[imageii - 1][rowii - 1]) / 2
-                southeast[image, row, 1] = (frameii[imageii, rowii] + frameii[imageii - 1][rowii + 1]) / 2
-
-        # fix longitude edge cases, by looking for crisscrossing, and truncating
-        northwest[:, :, 1] = numpy.where(northwest[:, :, 1] < longitude, northwest[:, :, 1], longitude)
-        northeast[:, :, 1] = numpy.where(northeast[:, :, 1] > longitude, northeast[:, :, 1], longitude)
-        southwest[:, :, 1] = numpy.where(southwest[:, :, 1] < longitude, southwest[:, :, 1], longitude)
-        southeast[:, :, 1] = numpy.where(southeast[:, :, 1] > longitude, southeast[:, :, 1], longitude)
-
-        # average all overlapping corners
-        overlap = southeast[1:, :-1, :] + southwest[1:, 1:, :] + northwest[:-1, 1:, :] + northeast[:-1, :-1, :]
-        average = overlap / 4
-
-        # transfer average
-        southeast[1:, :-1, :] = average
-        southwest[1:, 1:, :] = average
-        northwest[:-1, 1:, :] = average
-        northeast[:-1, :-1, :] = average
-
-        # average western edge
-        average = (southwest[1:, 0, :] + northwest[:-1, 0, :]) / 2
-        southwest[1:, 0, :] = average
-        northwest[:-1, 0, :] = average
-
-        # average eastern edge
-        average = (southeast[1:, -1, :] + northeast[:-1, -1, :]) / 2
-        southeast[1:, -1, :] = average
-        northeast[:-1, -1, :] = average
-
-        # average northern edge
-        average = (northwest[-1, 1:, :] + northeast[-1, :-1, :]) / 2
-        northwest[-1, 1:, :] = average
-        northeast[-1, :-1, :] = average
-
-        # average southern edge
-        average = (southwest[0, 1:, :] + southeast[0, :-1, :]) / 2
-        southwest[0, 1:, :] = average
-        southeast[0, :-1, :] = average
-
-        # # subtact 360 from any longitudes over 180
-        # northwest[:, :, 1] = numpy.where(northwest[:, :, 1] >= 180, northwest[:, :, 1] - 360, northwest[:, :, 1])
-        # northeast[:, :, 1] = numpy.where(northeast[:, :, 1] >= 180, northeast[:, :, 1] - 360, northeast[:, :, 1])
-        # southeast[:, :, 1] = numpy.where(southeast[:, :, 1] >= 180, southeast[:, :, 1] - 360, southeast[:, :, 1])
-        # southwest[:, :, 1] = numpy.where(southwest[:, :, 1] >= 180, southwest[:, :, 1] - 360, southwest[:, :, 1])
-
-        # collect corners
-        corners = {'northwest': northwest, 'northeast': northeast}
-        corners.update({'southwest': southwest, 'southeast': southeast})
-
-        return corners
-
-    def _garner(self, data, path, route=None, mode=None, scan=False):
-        """Gather all routes and shapes from a datafile.
-
-        Arguments:
-            data: dict or h5
-            path: str, file path
-            route=None: current route
-            mode=None: mode to restrict gathering with
-
-        Returns:
-            list of dicts
-        """
-
-        # initialize routes for first round
-        route = route or []
-
-        # initialize collection
-        collection = []
-
-        # test mode condition
-        allow = True
-        if mode:
-
-            # if the specific mode is not in the route
-            address = ':'.join(route)
-            if len(route) > 2 and mode not in address:
-
-                # stop gathering
-                allow = False
-
-        # only proceed if allowed by mode condition
-        if allow:
-
-            # try to
-            try:
-
-                # get all fields
-                for field in data.groups:
-
-                    # if scan
-                    if scan:
-
-                        # print the field
-                        self._print(field)
-
-                    # # check for variables
-                    # slash = '/'.join([''] + route + [field])
-                    #
-                    # self._print(slash)
-
-                    # get variables
-                    variables = data[field].variables
-
-                    # for each variable
-                    for variable, info in variables.items():
-
-                        # begin attributes with dimensions
-                        attributes = {'dimensions': info.dimensions, 'netCDF': True}
-                        for attribute in info.ncattrs():
-
-                            # add to attributes
-                            attributes[attribute] = info.getncattr(attribute)
-
-                        # add entry to collection
-                        parameters = {'route': route + [field, variable], 'shape': info.shape, 'path': path}
-                        parameters.update({'attributes': attributes, 'format': info.dtype})
-                        feature = Feature(**parameters)
-                        collection.append(feature)
-
-                    # get dimensions
-                    dimensions = data[field].dimensions
-
-                    # for each variable
-                    for dimension, info in dimensions.items():
-
-                        # begin attributes with dimensions
-                        attributes = {'netCDF': True, 'dimension': True}
-                        attributes.update({'name': info.name, 'size': info.size, 'group': info.group().name})
-                        attributes.update({'isunlimited': info.isunlimited()})
-
-                        # add net attribute
-                        attributes.update({'net': True})
-
-                        # add entry to collection
-                        parameters = {'route': route + [field, dimension], 'shape': (info.size,), 'path': path}
-                        parameters.update({'attributes': attributes, 'format': int})
-                        feature = Feature(**parameters)
-                        collection.append(feature)
-
-                    # get groups
-                    groups = data[field].groups
-
-                    # if there are no groups, variables or dimensions
-                    if not groups and not variables and not dimensions:
-
-                        # begin attributes with dimensions
-                        info = {attribute: data[field].getncattr(attribute) for attribute in data[field].ncattrs()}
-                        attributes = {'netCDF': True, 'metadata': True}
-                        attributes.update(info)
-
-                        # add entry to collection
-                        parameters = {'route': route + [field], 'shape': (0,), 'path': path}
-                        parameters.update({'attributes': attributes, 'format': str})
-                        feature = Feature(**parameters)
-                        collection.append(feature)
-
-                    # and add each field to the collection
-                    collection += self._garner(data[field], path, route + [field], mode=mode, scan=scan)
-
-            # unless it is an endpoint
-            except AttributeError:
-
-                self._print('error: {}'.format(route))
-
-        return collection
 
     def _gather(self, data, path, route=None, mode=None, scan=False):
         """Gather all routes and shapes from a datafile.
@@ -1001,7 +561,7 @@ class Hydra(Core):
 
                     # determine shape and type
                     shape = data.shape
-                    form = data.dtype
+                    format = data.dtype
 
                     # if scanning
                     if scan:
@@ -1016,24 +576,12 @@ class Hydra(Core):
                     problems = ('DIMENSION_LIST', 'REFERENCE_LIST')
                     attributes = {name: value for name, value in data.attrs.items() if name not in problems}
 
-                    # # try to
-                    # try:
-                    #
-                    #     # add fill value property
-                    #     attributes['fill_property'] = data.fillvalue
-                    #
-                    # # unless not available
-                    # except AttributeError:
-                    #
-                    #     # skip
-                    #     pass
-
                     # if the type is simple
-                    if len(form) < 1:
+                    if len(format) < 1:
 
                         # add entry to collection
                         parameters = {'route': route, 'shape': shape, 'path': path}
-                        parameters.update({'attributes': attributes, 'format': form})
+                        parameters.update({'attributes': attributes, 'format': format})
                         feature = Feature(**parameters)
                         collection.append(feature)
 
@@ -1041,7 +589,7 @@ class Hydra(Core):
                     else:
 
                         # convert to numpy dtype
-                        conversion = numpy.dtype(form)
+                        conversion = numpy.dtype(format)
 
                         # get attributes
                         problems = ('DIMENSION_LIST', 'REFERENCE_LIST')
@@ -1050,12 +598,12 @@ class Hydra(Core):
                         # for each member of the type
                         for name in conversion.names:
 
-                            # get form
-                            form = conversion.fields[name]
+                            # get format
+                            format = conversion.fields[name]
 
                             # create feature
                             parameters = {'route': route + [name], 'shape': shape, 'path': path}
-                            parameters.update({'attributes': attributes, 'format': form})
+                            parameters.update({'attributes': attributes, 'format': format})
                             feature = Feature(**parameters)
                             collection.append(feature)
 
@@ -1067,55 +615,6 @@ class Hydra(Core):
 
         return collection
 
-    def _grow(self, level=0, destination=None, subset=None):
-        """Make a tree of the file contents of an h5 file, to a certain level.
-
-        Arguments:
-            level=2: the max nesting level to see
-            destination: str, file path for destination
-            subset: str, slashed field list
-
-        Returns:
-            None
-        """
-
-        # begin tree
-        tree = {}
-
-        # for each feature
-        for feature in self:
-
-            # decompose slash
-            slash = feature.slash.split('/')
-
-            # for all but the last
-            branch = tree
-            for member in slash[:-1]:
-
-                # move to next member
-                branch.setdefault(member, {})
-                branch = branch[member]
-
-            # at last entry, add shape
-            branch[feature.name] = feature.shape
-
-        # if a subset is given
-        if subset:
-
-            # for each member
-            for field in subset.split('/'):
-
-                # subset the tree
-                tree = tree[field]
-
-        # crete tree
-        self._look(tree, level, destination)
-
-        # set tree
-        self.tree = tree
-
-        return None
-
     def _insert(self, array, destination, name, category):
         """Insert a feature into an hdf4 file.
 
@@ -1123,7 +622,7 @@ class Hydra(Core):
             array: numpy array,
             destination: str, filepath
             name: str, name of science
-            category: list of str, address of group
+            category: str, name of group
 
         Returns:
             None
@@ -1137,36 +636,32 @@ class Hydra(Core):
 
         # scan for registry
         registry = list(self._scan(four).items())
-
-        # sort for best match
-        registry.sort(key=lambda pair: category == pair[1], reverse=True)
+        registry.sort(key=lambda pair: category in pair[1], reverse=True)
         identity = registry[0][0]
+
+
+        self._tell(registry)
+
+        print(registry[0])
 
         # find the correctly named sd
         group = groups.attach(identity)
         tags = group.tagrefs()
+
+        print(tags)
+
         for tag, number in tags:
 
-            # try to
-            try:
+            # get attributes
+            dataset = science.select(science.reftoindex(number))
+            nameii, rank, dims, type, _ = dataset.info()
 
-                # get attributes
-                dataset = science.select(science.reftoindex(number))
-                nameii, rank, dims, type, _ = dataset.info()
+            # insert new data
+            if nameii == name:
 
-                # insert new data
-                if nameii == name:
-
-                    # insert
-                    print('inserting {}...'.format(name))
-                    dataset[:] = array[0]
-
-            # otherwise
-            except HDF4Error as error:
-
-                # alert
-                pass
-                #self._print(error)
+                # insert
+                print('inserting {}...'.format(name))
+                dataset[:] = array
 
         # close all apis
         groups.end()
@@ -1175,108 +670,6 @@ class Hydra(Core):
         four.close()
 
         return None
-
-    def _mask(self, mask):
-        """Retrieve pixels from a mask.
-
-        Arguments:
-            mask: numpy.array boolean mask
-
-        Returns:
-            list of tuples, the pixels
-        """
-
-        # get pixels
-        pixels = self._pin(1, mask.astype(int), mask.sum())
-
-        return pixels
-
-    def _orient(self, degrees, east=False):
-        """Construct an oriented latitude or longitude tag from a signed decimal.
-
-        Arguments:
-            degrees: float, degrees latitutde
-            east: boolean, use east west for longitude instead?
-
-        Returns:
-            string
-        """
-
-        # construct tag assuming north - south
-        tag = self._pad(int(abs(degrees)), 2) + 'N' * (degrees >= 0) + 'S' * (degrees < 0)
-
-        # if not east west
-        if east:
-
-            # construct tag
-            tag = self._pad(int(abs(degrees)), 3) + 'E' * (degrees >= 0) + 'W' * (degrees < 0)
-
-        return tag
-
-    def _orientate(self, latitude, longitude):
-        """Create corners by orienting latitude bounds and longitude bounds.
-
-        Arguments:
-            latitude: numpy array, latitude bounds
-            longitude: numpy array, longitude bounds
-
-        Returns:
-            dict of numpy arrays
-        """
-
-        # add 360 to all negative longitude bounnds
-        longitude = numpy.where(longitude < 0, longitude + 360, longitude)
-
-        # get all cardinal directions
-        cardinals = {'south': latitude.min(axis=2), 'north': latitude.max(axis=2)}
-        cardinals.update({'west': longitude.min(axis=2), 'east': longitude.max(axis=2)})
-
-        # begin corners with zeros
-        compasses = ('northwest', 'northeast', 'southeast', 'southwest')
-        compassesii = ('northeast', 'southeast', 'southwest', 'northwest')
-        corners = {compass: numpy.zeros((latitude.shape[0], latitude.shape[1], 2)) for compass in compasses}
-
-        # double up bounds
-        latitude = latitude.transpose(2, 1, 0)
-        longitude = longitude.transpose(2, 1, 0)
-        latitude = numpy.vstack([latitude, latitude, latitude]).transpose(2, 1, 0)
-        longitude = numpy.vstack([longitude, longitude, longitude]).transpose(2, 1, 0)
-
-        # go through each position
-        for index in range(4):
-
-            # check against corners and add if south and west are the same
-            mask = (latitude[:, :, index] == cardinals['north'])
-            maskii = (longitude[:, :, index] < longitude[:, :, index + 2])
-            masque = numpy.logical_and(mask, maskii)
-
-            # for each point
-            for way, compass in enumerate(compasses):
-
-                # add corners
-                corners[compass][:, :, 0] = numpy.where(masque, latitude[:, :, index + way], corners[compass][:, :, 0])
-                corners[compass][:, :, 1] = numpy.where(masque, longitude[:, :, index + way], corners[compass][:, :, 1])
-
-            # check against corners and add if south and west are the same
-            mask = (latitude[:, :, index] == cardinals['north'])
-            maskii = (longitude[:, :, index] > longitude[:, :, index + 2])
-            masque = numpy.logical_and(mask, maskii)
-
-            # for each point
-            for way, compass in enumerate(compassesii):
-
-                # add corners
-                corners[compass][:, :, 0] = numpy.where(masque, latitude[:, :, index + way], corners[compass][:, :, 0])
-                corners[compass][:, :, 1] = numpy.where(masque, longitude[:, :, index + way], corners[compass][:, :, 1])
-
-        # subtract 360 from longitudes
-        for compass in compasses:
-
-            # subtract form longitude
-            corner = corners[compass][:, :, 1]
-            corners[compass][:, :, 1] = numpy.where(corner > 180, corner - 360, corner)
-
-        return corners
 
     def _parse(self, path):
         """Parse file name for orbital context information.
@@ -1330,208 +723,40 @@ class Hydra(Core):
 
         return context
 
-    def _pick(self, word):
-        """Pick the first path with the given keyword.
+    def _plant(self):
+        """Construct tree from all features.
 
         Arguments:
-            word: str, keyword
+            None
 
         Returns:
-            list of str
+            None
         """
 
-        # get list of path indices
-        names = [path for path in self.paths if word in path.split('/')[-1]]
+        # begin tree
+        tree = {}
 
-        return names
+        # for each feature
+        for feature in self:
 
-    def _pin(self, targets, arrays, number=5, weights=None):
-        """Pinpoint the coordinates that are closest to the target in an array.
+            # decompose slash
+            slash = feature.slash.split('/')
 
-        Arguments:
-            targets: float, target value
-            arrays: numpy array
-            number: number of entries to retrieve
-            weights: list of weights
+            # for all but the last
+            branch = tree
+            for member in slash[:-1]:
 
-        Returns:
-            list of ( int ) tuples
-        """
+                # move to next member
+                branch.setdefault(member, {})
+                branch = branch[member]
 
-        # try to
-        try:
+            # at last entry, add shape
+            branch[feature.name] = feature.shape
 
-            # access first target
-            _ = targets[0]
+        # crete tree
+        self.tree = tree
 
-        # unless not a list
-        except (TypeError, IndexError):
-
-            # in which case, recast as list
-            targets = [targets]
-            arrays = [arrays]
-
-        # set weights
-        weights = weights or [1.0 for _ in targets]
-
-        # compute the squared distance from target
-        squares = [(weight * (array - target)) ** 2 for weight, array, target in zip(weights, arrays, targets)]
-        summation = sum(squares)
-
-        # get the shape
-        shape = summation.shape
-
-        # get ordering
-        order = summation.flatten().argsort()
-
-        # for each entry
-        indices = []
-        for entry in order[:number]:
-
-            # get the indices
-            remainder = entry
-            point = []
-            for place, span in enumerate(shape):
-
-                # get sum of all shapes past the relevant
-                block = numpy.prod(shape[place + 1:])
-                position = int(numpy.floor(remainder / block))
-
-                # add to point
-                point.append(position)
-
-                # recalculate remainder
-                remainder -= (position * block)
-
-            # add point to indices
-            indices.append(tuple(point))
-
-        return indices
-
-    def _point(self, vector, table, nodes, show=False):
-        """Linearly Interpolate a vector of values onto a table.
-
-        Arguments:
-            vector: unpacked list of floats
-            table: numpy.array of floats, the interpolation table
-            nodes: list of lists of floats, the node coordinates
-            show: boolean, show nodes and brackets?
-
-        Returns:
-            float, the interpolated value
-        """
-
-        # For each entry
-        brackets = []
-        for quantity, node in zip(vector, nodes):
-
-            # if descending
-            if node[-1] < node[0]:
-
-                # get the bracket indices, inclusive
-                last = [quantity > tick for tick in node].index(True)
-                first = last - 1
-                bracket = (first, last)
-
-            # otherwise, assume ascending
-            else:
-
-                # get the bracket indices, inclusive
-                last = [quantity < tick for tick in node].index(True)
-                first = last - 1
-                bracket = (first, last)
-
-            # if first bracket is too small
-            if first < 0:
-
-                # set to last two
-                bracket = (0, 1)
-
-            # if last bracket is too big
-            if last > len(node) - 1:
-
-                # set to last two
-                bracket = (len(node) - 2, len(node) - 1)
-
-            # append to brackets
-            brackets.append(bracket)
-
-            # if showing
-            if show:
-
-                # print bracket
-                self._print(quantity)
-                self._print(bracket)
-                self._print(node)
-                self._print('')
-
-        # create miniature table
-        cube = table
-        for axis, bracket in enumerate(brackets):
-
-            # take subset
-            cube = numpy.take(cube, bracket, axis)
-
-        # for each bracket
-        result = cube
-        for bracket, node, quantity in zip(brackets, nodes, vector):
-
-            # unpack bracket
-            first, last = bracket
-
-            # find the weight, a ( 1 - w ) + b ( w ) = r, w = ( r - a ) / ( b - a )
-            weight = (quantity - node[first]) / (node[last] - node[first])
-
-            # reduce along axis
-            result = (1 - weight) * result[0] + weight * result[1]
-
-        return result
-
-    def _polymerize(self, latitude, longitude, resolution):
-        """Construct polygons from latitude and longitude bounds.
-
-        Arguments:
-            latitude: numpy array of latitude bounds
-            longitude: numpy array of longitude bounds
-            resolution: int, vertical compression factor
-
-        Returns:
-            numpy.array
-        """
-
-        # squeeze arrays
-        latitude = latitude.squeeze()
-        longitude = longitude.squeeze()
-
-        # if bounds are given
-        if len(latitude.shape) > 2:
-
-            # orient the bounds
-            corners = self._orientate(latitude, longitude)
-
-        # otherwise
-        else:
-
-            # get corners from latitude and longitude points
-            corners = self._frame(latitude, longitude)
-
-        # compress corners vertically
-        corners = self._compress(corners, resolution, 1)
-
-        # construct bounds
-        compasses = ('southwest', 'southeast', 'northeast', 'northwest')
-        arrays = [corners[compass][:, :, 0] for compass in compasses]
-        bounds = numpy.stack(arrays, axis=2)
-        arrays = [corners[compass][:, :, 1] for compass in compasses]
-        boundsii = numpy.stack(arrays, axis=2)
-
-        # adjust polygon  boundaries to avoid crossing dateline
-        boundsii = self._cross(boundsii)
-
-        # make polygons
-        polygons = numpy.dstack([bounds, boundsii])
-
-        return polygons
+        return None
 
     def _populate(self, features, discard=True):
         """Populate the instance with feature records.
@@ -1588,51 +813,6 @@ class Hydra(Core):
 
         return None
 
-    def _project(self, novel, abscissa, ordinate):
-        """Project a new abscissa onto another abscissas and ordinate by linear interpolation.
-
-        Arguments:
-            novel: list of floats, new x values
-            abscissas: list of floats, x values
-            ordinate: list of floats, y values
-
-        Returns:
-            numpy array, new y values
-        """
-
-        # create squared arrays with new axis for new shape
-        ordinateii = numpy.array([ordinate] * len(novel))
-        abscissaii = numpy.array([abscissa] * len(novel))
-        novelii = numpy.array([novel] * len(abscissa)).transpose(1, 0)
-
-        # create lesser and greater matrices
-        lesser = abscissaii < novelii
-        greater = abscissaii > novelii
-
-        # make sure at least the first lesser value is true
-        lesser[:, 0] = True
-
-        # make sure at least the last greater value is true
-        greater[:, -1] = True
-
-        # create left and right mask
-        left = lesser & numpy.roll(greater, -1, axis=1)
-        right = numpy.roll(lesser, 1, axis=1) & greater
-
-        # create horizontal brackets
-        horizontal = (abscissaii * left.astype(int)).sum(axis=1)
-        horizontalii = (abscissaii * right.astype(int)).sum(axis=1)
-
-        # create vertical brackets
-        vertical = (ordinateii * left.astype(int)).sum(axis=1)
-        verticalii = (ordinateii * right.astype(int)).sum(axis=1)
-
-        # perform interpolation
-        slope = (verticalii - vertical) / (horizontalii - horizontal)
-        projection = vertical + slope * (novel - horizontal)
-
-        return projection
-
     def _register(self):
         """Construct all file paths.
 
@@ -1648,7 +828,7 @@ class Hydra(Core):
 
         # get all file paths
         paths = []
-        self._print('collecting paths from {}...'.format(self.source))
+        self._print('collecting paths...')
 
         # if a source directory is given
         if self.source:
@@ -1694,36 +874,14 @@ class Hydra(Core):
         paths = [path for path in paths if any([path.endswith(extension) for extension in self.extensions])]
         paths.sort()
 
-        # if showing paths
-        if self.show:
-
-            # print paths
-            self._tell(paths)
-            self._print('{} paths collected.\n'.format(len(paths)))
+        # print paths
+        self._tell(paths)
+        self._print('{} paths collected.\n'.format(len(paths)))
 
         # set attribute
         self.paths = paths
 
         return None
-
-    def _resolve(self, array, resolution):
-        """Pare down an array to only mod zero entries based on resolution.
-
-        Arguments:
-            array: numpy array
-            resolution: int, number of pixels to combine
-
-        Returns:
-            numpy array
-        """
-
-        # get indices at mod 0
-        indices = numpy.array([index for index in range(array.shape[0]) if index % resolution == 0])
-
-        # apply to array
-        resolution = array[indices]
-
-        return resolution
 
     def _refer(self, features, reference=None):
         """Create a reference for a set of features for quicker lookup.
@@ -1750,62 +908,6 @@ class Hydra(Core):
             names.append(feature)
 
         return reference
-
-    def _relate(self, first, second, percent=False):
-        """Calculate the percent difference between two arrays.
-
-        Arguments:
-            first: numpy array
-            second: numpy array
-            percent: boolean, compute percent difference instead of differecnce?
-
-        Returns:
-            numpy array
-        """
-
-        # calculate difference
-        relation = second - first
-
-        # if difference
-        if percent:
-
-            # calculate difference
-            relation = 100 * ((second / first) - 1)
-
-        return relation
-
-    def _round(self, quantity, digits=2, up=False):
-        """Round a value based on digits.
-
-        Arguments:
-            quantity: float
-            digits: int, number of post decimal digits to keep
-            up: boolean, round up?
-
-        Returns:
-            None
-        """
-
-        # multiple by power of digtsp
-        power = 10 ** digits
-        approximation = quantity * 10 ** digits
-
-        # if rounding up
-        if up:
-
-            # round up
-            approximation = math.ceil(approximation)
-
-        # otherwise
-        else:
-
-            # round down
-            approximation = math.floor(approximation)
-
-        # divide by power
-        approximation = approximation / power
-
-        return approximation
 
     def _scan(self, four):
         """Scan all reference ids from the hdf4 file.
@@ -1981,39 +1083,6 @@ class Hydra(Core):
 
         return code
 
-    def _seek(self, group, names=None):
-        """Seek nested metadata attributes in a netcdf group.
-
-        Arguments:
-            group: netCDF group
-            names: list of previous groups
-
-        Returns:
-            None
-        """
-
-        # set default names
-        names = names or []
-
-        # print name
-        self._print('')
-        self._print('{}: '.format('/'.join(names)))
-
-        # get all attributes
-        attributes = group.ncattrs()
-
-        # for each attribute
-        [self._print('{}: {}'.format(attribute, group.getncattr(attribute))) for attribute in attributes]
-
-        # get all nested gruops
-        groups = group.groups
-        for key in groups.keys():
-
-            # check next level
-            self._seek(group[key], names + [key])
-
-        return None
-
     def _serpentize(self, name):
         """Make a camel case name into snake case.
 
@@ -2110,6 +1179,137 @@ class Hydra(Core):
 
         return details
 
+    def _stash(self, features, destination, link=None, mode='w', compression=None, scan=False):
+        """Stash a group of features in an hdf5 file.
+
+        Arguments:
+            features: list of dicts
+            destination: str, destination filepath
+            link: str, name of link folder
+            mode: str, writemode
+            compression: compression option
+            scan: scan feature names?
+
+        Returns:
+            None
+        """
+
+        # fill all features if not yet filled
+        [feature.fill() for feature in features]
+
+        # link all Categories field, but not IndependentVariables
+        [feature.update({'link': False}) for feature in features if 'IndependentVariables' in feature.slash]
+        [feature.update({'link': True}) for feature in features if 'Categories' in feature.slash]
+
+        # begin file
+        five = h5py.File(destination, mode, track_order=True)
+
+        # get list of all groups, maintaining feature order
+        addresses = [feature.slash.split('/')[:-1] for feature in features]
+        groups = [['/'.join(address[:index + 1]) for index, _ in enumerate(address)] for address in addresses]
+        groups = [address for group in groups for address in group]
+
+        # eliminate duplicates and empty name
+        groups = list({group: True for group in groups if group}.keys())
+
+        # sort groups and features by name
+        groups.sort()
+        features.sort(key=lambda feature: feature.slash)
+
+        # create groups
+        for address in groups:
+
+            # print
+            self._print(address)
+
+            # try to
+            try:
+
+                # add the group, tracking order
+                group = five.create_group(address, track_order=True)
+
+            # unless python 2, without this option
+            except TypeError:
+
+                # try to
+                try:
+
+                    # ignore track order option
+                    group = five.create_group(address)
+
+                # unless already exists
+                except ValueError:
+
+                    # pass and alert
+                    self._print('{} group already exits'.format(link))
+                    pass
+
+            # unless already exists
+            except ValueError:
+
+                # pass and alert
+                self._print('{} group already exits'.format(link))
+                pass
+
+        # if a link is given
+        links = None
+        if link:
+
+            # try to
+            try:
+
+                # create links folder, with track_order option
+                links = five.create_group(link)
+
+            # unless already exists
+            except ValueError:
+
+                # pass and alert
+                self._print('{} group already exits'.format(link))
+                links = five[link]
+
+        # go through each feature
+        for feature in features:
+
+            # if scanning
+            if scan:
+
+                # print featue
+                self._print(feature.name, feature.slash)
+
+            # try to
+            try:
+
+                # add dataset
+                tensor = five.create_dataset(feature.slash, data=feature.data, compression=compression)
+
+                # for each attribute
+                for attribute, information in feature.attributes.items():
+
+                    # add to tensor
+                    tensor.attrs[attribute] = information
+
+                # create link
+                if feature.link:
+
+                    # add tensor as link
+                    links[feature.name] = tensor
+
+            # unless already exists
+            except (ValueError, RuntimeError, OSError, TypeError) as error:
+
+                # pass and alert
+                pass
+                #self._print('skipping {}, already exists: {}'.format(feature.slash, error))
+
+        # close hdf5 file
+        five.close()
+
+        # print messate
+        self._print('{} stashed.'.format(destination))
+
+        return None
+
     def _take(self, *indices, paths=None):
         """Take a subset of paths based on ther index.
 
@@ -2128,104 +1328,6 @@ class Hydra(Core):
         subset = [paths[index] for index in indices]
 
         return subset
-
-    def _unite(self, *bits):
-        """Recombine a list of bits into a decimal.
-
-        Arguments:
-            *bits: list of ints, the bit flags
-
-        Returns:
-            int
-        """
-
-        # default combination to 0
-        combination = 0
-
-        # for each bit
-        for bit in bits:
-
-            # add 2 to the power of the bit
-            combination += 2 ** bit
-
-        return combination
-
-    def _view(self, data, pixel=None, fields=None):
-        """Print list of data shapes from a dataset.
-
-        Arguments:
-            data: dict of numpy arrays.
-            fields: list of str, the fields to see
-            pixel: tuple of ints, particular pixel
-
-        Returns:
-            None
-        """
-
-        # print spacer
-        self._print('')
-
-        # set fields
-        fields = fields or list(data.keys())
-
-        # for each item
-        for name, array in data.items():
-
-            # check for field membership
-            if name in fields:
-
-                # try to
-                try:
-
-                    # if pariruclar pixel
-                    if pixel:
-
-                        # print each one
-                        self._print(name, array.shape, '{}: {}'.format(pixel, array[pixel[:len(array.shape)]]))
-
-                    else:
-
-                        # create mask for valid data
-                        mask = (numpy.isfinite(array)) & (abs(array) < 1e20) & (array > -998)
-                        maskii = numpy.logical_not(mask)
-
-                        # get minimum and maximum
-                        minimum = 0
-                        maximum = 0
-                        size = int(mask.sum())
-                        sizeii = int(numpy.prod(array.shape))
-                        if size > 0:
-
-                            # get valid min and max
-                            minimum = array[mask].min()
-                            maximum = array[mask].max()
-
-                        # create fills
-                        fills = ''
-                        if maskii.sum() > 0:
-
-                            # get fills
-                            fills = numpy.unique(array[maskii])
-
-                        # create spacings
-                        space = max([0, 18 - len(str(array.shape))]) * ' '
-                        spaceii = max([0, 25 - len(name)]) * ' '
-
-                        # print each one
-                        formats = (array.shape, space, name, spaceii, minimum, maximum, size, sizeii, fills)
-                        self._print('{} {}{} {}{} to {} ( {} / {} ) {}'.format(*formats))
-
-                # unless error
-                except (ValueError, IndexError, TypeError):
-
-                    # print alert
-                    self._print('{}: pass'.format(name))
-                    pass
-
-        # print spacer
-        self._print('')
-
-        return None
 
     def apply(self, filter, features=None, discard=False):
         """Apply a filter to a list of records.
@@ -2257,173 +1359,6 @@ class Hydra(Core):
             self._populate(survivors, discard=discard)
 
         return survivors
-
-    def assemble(self, paths, three=True):
-        """Assemble data from all paths into a dataset.
-
-        Arguments:
-            paths: list of str, filepaths
-            three: boolean, include three dimensions?
-
-        Returns:
-            dict
-        """
-
-        # get current file for later
-        current = self.current
-
-        # begin data
-        data = {}
-
-        # for each path
-        for path in paths:
-
-            # ingest the data
-            self.ingest(path)
-
-            # get a counter for the shapes
-            counter = list(Counter([feature.shape for feature in self if len(feature.shape) == 2]).items())
-            counter.sort(key=lambda pair: pair[1], reverse=True)
-            shape = counter[0][0]
-
-            # get all 2-D feature names
-            names = [feature.name for feature in self if feature.shape == shape]
-
-            # set all data names to empty list
-            data.update({name: data.setdefault(name, []) for name in names})
-
-            # append all new data
-            [data[name].append(self.grab(name)) for name in names]
-
-            # if adding 3-D data
-            if three:
-
-                # get all 3-D feature names
-                threes = [feature for feature in self if len(feature.shape) == 3]
-                names = [feature.name for feature in threes if feature.shape[:2] == shape]
-
-                # for each name
-                for name in names:
-
-                    # grab array
-                    array = self.grab(name)
-                    size = array.shape[2]
-
-                    # for each position
-                    for position in range(size):
-
-                        # construct new name
-                        nameii = '{}_{}'.format(name, self._pad(position))
-
-                        # set all 3-D names to empty list
-                        data.update({nameii: data.setdefault(nameii, [])})
-
-                        # append all new data
-                        data[nameii].append(array[:, :, position])
-
-            # add rows and scanlines
-            data.update({name: data.setdefault(name, []) for name in ('row', 'scan')})
-
-            # create row and scan matrices
-            row = numpy.array([list(range(shape[1]))] * shape[0])
-            scan = numpy.array([list(range(shape[0]))] * shape[1]).transpose(1, 0)
-            data['row'].append(row)
-            data['scan'].append(scan)
-
-        # concatenate all arrays
-        data = {name: numpy.vstack(arrays) for name, arrays in data.items()}
-
-        # if current is not blank
-        if current:
-
-            # reingest current file
-            self.ingest(current)
-
-        return data
-
-    def attribute(self, five=None, look=True):
-        """Print global file attributes.
-
-        Arguments:
-            five: hdf five object
-            look: boolean, print to screen?
-
-        Returns:
-            None
-        """
-
-        # get default five
-        five = five or self._fetch(self.current)
-
-        # for each attribute
-        globals = {}
-
-        # if netcdf is flals
-        if not self.net:
-
-            # get attributes
-            for name, contents in five.attrs.items():
-
-                # print
-                globals[name] = contents
-                # self._print('{}: {}'.format(name, contents))
-
-        # if netcdf
-        if self.net:
-
-            # get attributes
-            for name in five.ncattrs():
-
-                # print
-                globals[name] = five.getncattr(name)
-
-        # try to
-        try:
-
-            # close file
-            five.close()
-
-        # otheerwise
-        except AttributeError:
-
-            # skip
-            pass
-
-        # if look option
-        if look:
-
-            # print to screen
-            self._look(globals, 3)
-
-        return globals
-
-    def augment(self, path, features, destination):
-        """Augment a file with a feature.
-
-        Arguments:
-            path: str, path of hdf5 file
-            features: list of Feature instances
-            destination: str, new file path
-
-        Returns:
-            None
-        """
-
-        # ingest path
-        hydra = Hydra(path)
-        hydra.ingest(0)
-
-        # grab all existing features if addresses are different
-        slashes = [feature.slash for feature in features]
-        compilation = [feature for feature in hydra if feature.slash not in slashes]
-
-        # add new features
-        compilation += features
-
-        # stash
-        self.stash(compilation, destination)
-
-        return None
 
     def cascade(self, formula, reference=None, scan=True):
         """Cascade the features from one file to another, using function objects.
@@ -2555,238 +1490,6 @@ class Hydra(Core):
 
         return None
 
-    def compare(self, path, pathii, fraction=None):
-        """Compare two hdf5 paths using hdiff.
-
-        Arguments:
-            path: str, first file path
-            pathii: str, second file path
-            fraction: float, minimum relative difference
-
-        Returns:
-            None
-        """
-
-        # construct call
-        call = ['h5diff', path, pathii]
-
-        # if fraction
-        if fraction:
-
-            # construct call
-            call = ['h5diff', '-p {}'.format(fraction), path, pathii]
-
-        # run with subprocess
-        self._print(' '.join(call))
-        subprocess.call(call)
-
-        return None
-
-    def contrast(self, path, pathii, percent=False):
-        """Determine span of percent differences for all arrays in the collection.
-
-        Arguments:
-            path: str, pathname
-            pathii: str, pathname
-            percent: boolean, use percent difference instead?
-
-        Returns:
-            None
-        """
-
-        # silencr runtime warnings
-        warnings.filterwarnings("ignore", category=RuntimeWarning)
-
-        # set symbols depending on percent or difference
-        symbols = {False: '', True: '%'}
-
-        # get current path
-        current = self.current
-
-        # get first path arrays
-        self.ingest(path)
-        arrays = {feature.name: feature.distil() for feature in self}
-
-        # get second path arrays
-        self.ingest(pathii)
-        arraysii = {feature.name: feature.distil() for feature in self}
-
-        # reingest current path
-        self.ingest(current)
-
-        # get collection of intersecting names
-        names = set(arrays.keys()) & set(arraysii.keys())
-        names = list(names)
-        names.sort()
-
-        # get fields missing from one and not the other
-        missing = set(arrays.keys()) - set(arraysii.keys())
-        missingii = set(arraysii.keys()) - set(arrays.keys())
-
-        # print
-        self._print('')
-        self._print('contrasting {} with {}:'.format(self._file(path, 1), self._file(pathii, 1)))
-        self._print('')
-
-        # if missing fields
-        if len(missing) > 0:
-
-            # print
-            self._print('missing from {}: {}'.format(self._file(pathii, 1), missing))
-            self._print('')
-
-        # if missing fields
-        if len(missingii) > 0:
-
-            # print
-            self._print('missing from {}: {}'.format(self._file(path, 1), missingii))
-            self._print('')
-
-        # for each name
-        for name in names:
-
-            # get arrays
-            array = arrays[name]
-            arrayii = arraysii[name]
-
-            # try to
-            try:
-
-                # make mask for finites
-                mask = (numpy.isfinite(array)) & (numpy.isfinite(arrayii))
-
-                # get number of differences
-                differences = (array[mask] != arrayii[mask]).sum()
-
-                # if there are differences
-                if differences > 0:
-
-                    # calculate percent difference
-                    relation = self._relate(array[mask], arrayii[mask], percent)
-
-                    # get mask for finite relations
-                    maskii = numpy.isfinite(relation)
-
-                    # set formats
-                    formats = [name, differences, maskii.sum(), numpy.prod(array.shape)]
-
-                    # if there are entrei
-                    if maskii.sum() > 0:
-
-                        # add formats
-                        formats += [self._round(relation[maskii].min(), 4), symbols[percent]]
-                        formats += [self._round(relation[maskii].max(), 4), symbols[percent]]
-
-                    # otherwise
-                    else:
-
-                        # add formats
-                        formats += ['NA', symbols[percent]]
-                        formats += ['NA', symbols[percent]]
-
-                    # print to screen
-                    self._print('{}: ( {} ) differences, ({} / {}), {} {} to {} {}'.format(*formats))
-
-            # unless an error
-            except TypeError:
-
-                # pass
-                pass
-
-        # reset warnings
-        warnings.resetwarnings()
-
-        return None
-
-    def correlate(self, abscissa, ordinate, masking=True):
-        """Calculate the correlation coefficient between two variables.
-
-        Arguments:
-            abscissa: numpy array
-            ordinate: numpy array
-            masking: boolean, filter out fills and nans?
-
-        Returns:
-            float, correlation coefficient
-        """
-
-        # if masking:
-        if masking:
-
-            # set fills
-            fill = -999
-            fillii = 1e20
-
-            # get valid data mask
-            mask = (abscissa > fill) & (abs(abscissa) < fillii) & numpy.isfinite(abscissa)
-            maskii = (ordinate > fill) & (abs(ordinate) < fillii) & numpy.isfinite(ordinate)
-            masque = mask & maskii
-
-            # apply mask
-            abscissa = abscissa[masque]
-            ordinate = ordinate[masque]
-
-        # compute means
-        mean = abscissa.mean()
-        meanii = ordinate.mean()
-        bias = (abscissa - mean)
-        biasii = (ordinate - meanii)
-
-        # compute correlation
-        numerator = (bias * biasii).sum()
-        denominator = numpy.sqrt((bias ** 2).sum() * (biasii ** 2).sum())
-        correlation = numerator / denominator
-
-        return correlation
-
-    def differ(self, first, second, reference=None):
-        """Construct a dataset of differences between two files.
-
-        Arguments:
-            first: str, path of first file
-            second: str, path of second file
-            reference: str, field name for shape information.
-
-        Returns:
-            dict of differences
-        """
-
-        # retrieve current
-        current = self.current
-
-        # get the first dataset
-        self.ingest(first)
-        data = self.extract(reference)
-
-        # get the second dataset
-        self.ingest(second)
-        dataii = self.extract(reference)
-
-        # begin differences
-        differences = {}
-        for name in data.keys():
-
-            # try to
-            try:
-
-                # subtract and add to collection
-                difference = dataii[name] - data[name]
-                differences[name] = difference
-
-            # unless wrong type
-            except TypeError:
-
-                # alert pass
-                self._print('unable to subtract {}'.format(name))
-
-        # if current is valid
-        if current:
-
-            # reingest
-            self.ingest(current)
-
-        return differences
-
     def dig(self, search, reference=None):
         """Dig for features with specific members in their route.
 
@@ -2819,83 +1522,18 @@ class Hydra(Core):
         else:
 
             # check for all terms in the keys, excluding single keys
-            #keys = [key for key in reference.keys() if '/' in key]
-            keys = list(reference.keys())
+            keys = [key for key in reference.keys() if '/' in key]
             keys = [key for key in keys if all([field in key for field in search.split('/')])]
             for key in keys:
 
                 # add references
                 treasure += reference[key]
 
-        # remove non unique entries
-        treasure = {'{}/{}'.format(feature.path, feature.slash): feature for feature in treasure}
-        treasure = list(treasure.values())
-
         # sort to put exact last term up top
         term = search.split('/')[-1]
         treasure.sort(key=lambda feature: feature.name == term, reverse=True)
 
         return treasure
-
-    def extract(self, reference=None, addresses=False):
-        """Extract all data arrays into a dictionary.
-
-        Arguments:
-            reference: reference array with which to match shapes
-            addresses: boolean, use full addresses?
-
-        Return:
-            dict of data arrays
-        """
-
-        # begin data
-        data = {}
-
-        # if addresses selected
-        if addresses:
-
-            # make data from addresses
-            data.update({feature.slash: feature.distil() for feature in self})
-
-        # otherwise
-        else:
-
-            # use names
-            data.update({feature.name: feature.distil() for feature in self})
-
-        # if reference given
-        if reference:
-
-            # screen for shape
-            shape = data[reference].shape
-            data = {name: array for name, array in data.items() if array.shape == shape}
-
-        return data
-
-    def gist(self, pixel=None, address=False):
-        """Summarize data in the file.
-
-        Arguments:
-            pixel: tuple of ints, particular pixel
-            address: boolean, use full addres?
-
-        Returns:
-            None
-        """
-
-        # collect data with feature names
-        data = {feature.name: feature.distil() for feature in self}
-
-        # if full addresses
-        if address:
-
-            # collect data with feature names
-            data = {feature.slash: feature.distil() for feature in self}
-
-        # print to screen
-        self._view(data, pixel=pixel)
-
-        return None
 
     def glimpse(self, query, paths=None):
         """Glimpse a list of features matching the query for each file.
@@ -2926,39 +1564,7 @@ class Hydra(Core):
 
         return None
 
-    def grab(self, search, index=0, reference=None):
-        """Grab the first array based on the search.
-
-        Arguments:
-            search: slashed search string
-            index: int, index in list
-            reference: dict of feature lists, or feature list
-
-        Returns:
-            list of dicts
-        """
-
-        # default array
-        array = None
-
-        # dig up features
-        features = self.dig(search, reference)
-
-        # try to
-        try:
-
-            # get the first
-            array = features[index].distil()
-
-        # unless nothing found
-        except IndexError:
-
-            # print alert
-            self._print('{} came up empty!'.format(search))
-
-        return array
-
-    def ingest(self, path=0, mode=None, discard=True, names=None, folder='tmp', scan=False, net=False):
+    def ingest(self, path, mode=None, discard=True, names=None, folder='tmp', scan=False):
         """Ingest the data from a particular path, populating the instance with features.
 
         Arguments:
@@ -2976,29 +1582,8 @@ class Hydra(Core):
             self
         """
 
-        # assume path is an integer
-        try:
-
-            # in which case set path
-            path = self.paths[path]
-
-        # unless not an integer
-        except TypeError:
-
-            # look for keyword
-            paths = [entry for entry in self.paths if path in entry]
-
-            # try to
-            try:
-
-                # get first entry
-                path = paths[0]
-
-            # unless not in folder
-            except IndexError:
-
-                # in which case, leave path alonge
-                pass
+        # if given path is an integer, retrieve from self.paths
+        path = self.paths[path] if str(path).isdigit() else path
 
         # retrieve the collection
         if self._stage(path)['extension'] in ('.he4', '.he'):
@@ -3017,31 +1602,12 @@ class Hydra(Core):
             # replace path
             path = conversion
 
-        # set net attribute
-        self.net = net
+        # fetch the hdf5 file
+        with self._fetch(path) as five:
 
-        # if netcdf
-        if self.net:
-
-            # fetch the netcdf4 file
-            with self._fetch(path) as five:
-
-                # collect all features
-                features = self._garner(five, path, mode=mode, scan=scan)
-                self._populate(features, discard=discard)
-
-        # otherwise
-        else:
-
-            # fetch the hdf5 file
-            with self._fetch(path) as five:
-
-                # collect all features
-                features = self._gather(five, path, mode=mode, scan=scan)
-                self._populate(features, discard=discard)
-
-        # set current path
-        self.current = path
+            # collect all features
+            features = self._gather(five, path, mode=mode, scan=scan)
+            self._populate(features, discard=discard)
 
         return None
 
@@ -3236,48 +1802,16 @@ class Hydra(Core):
                 fusion.close()
 
             # create fusion file
-            self.stash(features, destination, 'Data')
+            self._stash(features, destination, 'Data')
 
         return None
 
-    def meditate(self, string, filter=True):
-        """Parse a metadata string into text.
-
-        Arguments:
-            string: str, metadata string
-
-        Returns:
-            list of str
-        """
-
-        # get lines
-        lines = string.split('\\n')
-
-        # strip tabls
-        lines = [line.strip('\\t') for line in lines]
-
-        # get key words
-        words = ['OBJECT', 'PARAMETER', 'VALUE', 'GROUP', 'CLASS', 'NUM_VAL']
-        words += ['FieldName', 'DataType', 'DimList']
-        exclusions = ['END_OBJECT', 'END_GROUP']
-
-        # if filtering
-        if filter:
-
-            # filter
-            lines = [line for line in lines if not any([word in line for word in exclusions])]
-            lines = [line for line in lines if any([word in line for word in words])]
-
-        return lines
-
-    def merge(self, paths, destination, lead=False, squeeze=False):
+    def merge(self, paths, destination):
         """Merge together several congruent hdf5 files in order
 
         Arguments:
             paths: list of str
             destination: str
-            lead: boolean, add new dimension?
-            squeeze: boolean, squeeze out trivial dimensions?
 
         Returns:
             None
@@ -3311,12 +1845,6 @@ class Hydra(Core):
         # features += self.apply(lambda feature: 'Categories' in feature.slash)
         [feature.fill() for feature in features]
 
-        # if wanting leading dimension
-        if lead:
-
-            # add leading dimension to primary features
-            [feature.instil(numpy.array([feature.spill()])) for feature in features]
-
         # for each secondary file
         self._print('adding secondaries...')
         for path in secondaries:
@@ -3333,59 +1861,22 @@ class Hydra(Core):
                 # for each feature
                 for feature in features:
 
+                    # find the equivalent in the secondary
+                    equivalent = self.dig(feature.slash)[0]
+
                     # try to
                     try:
 
-                        # find the equivalent in the secondary
-                        equivalent = self.dig(feature.slash)[0]
+                        # concatenate the data, adding leading dimension
+                        tensor = numpy.vstack([feature.spill(), equivalent.distil()])
+                        feature.instil(tensor)
 
-                        # try to
-                        try:
-
-                            # convert tensors to two dimensions if needed
-                            array = feature.spill()
-                            if len(array.shape) < 2:
-
-                                # convert
-                                array = numpy.array([array]).transpose(1, 0)
-
-                            # convert equivalent to 2-D
-                            arrayii = equivalent.distil()
-
-                            # if requesting leading dimenetion
-                            if lead:
-
-                                # add leading dimension
-                                arrayii = numpy.array([arrayii])
-
-                            # if less than 2-d
-                            if len(arrayii.shape) < 2:
-
-                                # convert
-                                arrayii = numpy.array([arrayii]).transpose(1, 0)
-
-                            # concatenate the data, adding leading dimension
-                            tensor = numpy.vstack([array, arrayii])
-                            feature.instil(tensor)
-
-                        # unless a mismatch occurs
-                        except ValueError:
-
-                            # zero out feature
-                            self._print('mismatch found for: {}, zeroing...'.format(feature.name))
-                            feature.instil(numpy.array([0]))
-
-                    # unless not found
-                    except IndexError:
+                    # unless a mismatch occurs
+                    except ValueError:
 
                         # zero out feature
-                        self._print('no entry for: {}, skipping...'.format(feature.name))
-
-                    # if squeeze
-                    if squeeze:
-
-                        # squeeze array
-                        feature.instil(feature.distil().squeeze())
+                        self._print('mismatch found for: {}, zeroing...'.format(feature.name))
+                        feature.instil(numpy.array([0]))
 
         # add link conditions
         #[feature.update({'link': True}) for feature in features if 'Categories' in feature.slash]
@@ -3394,7 +1885,7 @@ class Hydra(Core):
 
         # stash
         self._print('stashing {}...'.format(destination))
-        self.stash(features, destination, mode='w')
+        self._stash(features, destination, 'Data', mode='w')
 
         # print status
         self._print('stashed {}.'.format(destination))
@@ -3427,7 +1918,7 @@ class Hydra(Core):
         aliases = aliases or [None] * len(names)
         functions = functions or [None] * len(names)
         addresses = addresses or [None] * len(names)
-        attributes = attributes or [{}] * len(names)
+        attributes = attributes or [None] * len(names)
 
         # for each path and destination
         for path, destination in zip(paths, destinations):
@@ -3470,161 +1961,7 @@ class Hydra(Core):
             # link Categories to Data and stash
             [feature.update({'link': True}) for feature in cascade if 'Categories' in feature.slash]
             [feature.update({'link': False}) for feature in cascade if 'IndependentVariables' in feature.slash]
-            self.stash(cascade, destination, 'Data')
-
-        return None
-
-    def nether(self, path, mode='r'):
-        """Open a file with netcdf4.
-
-        Arguments:
-            path: str, filepath
-            mode: 'r' for read or 'r+' for read and write, 'a' for append, or 'w' for write
-
-        Returns:
-            netCDF4 Dataset
-        """
-
-        # open with netCDF4
-        net = netCDF4.Dataset(path, mode=mode)
-
-        return net
-
-    def plant(self, data, target, destination, masking=True, header=None, classify=False, give=False):
-        """Use random forest to predict target value from data
-
-        Arguments:
-            data: dict of str, numpy array
-            target: str, name of target variable
-            destination: str, pathname for destination
-            masking: boolean, apply nan and fill mask first?
-            header: header for report
-            classify: boolean, use classifier?
-            give: boolean, return forest as output?
-
-        Returns:
-            None
-        """
-
-        # begin report
-        report = header or ['Random forest for {}'.format(target)]
-        report.append('')
-
-        # if masking:
-        if masking:
-
-            # set fills
-            fill = -999
-            fillii = 1e20
-
-            # get valid data mask
-            masks = [(array > fill) & (abs(array) < fillii) & numpy.isfinite(array) for array in data.values()]
-
-            # multiply all masks
-            masque = masks[0]
-            for mask in masks[1:]:
-
-                # use logical and
-                masque = numpy.logical_and(masque, mask)
-
-            # check masked quantity
-            masked = masque.sum()
-            total = numpy.prod(masque.shape)
-            report.append(self._print('masque: {} of {}, {} %'.format(masked, total, 100 * masked / total)))
-
-            # apply masque
-            data = {name: array[masque] for name, array in data.items()}
-
-        # assemble matrix
-        names = [name for name in data.keys() if name != target] + [target]
-        train = numpy.array([data[name].flatten() for name in names]).transpose(1, 0)
-
-        # split off truth
-        matrix = train[:, :-1]
-        truth = train[:, -1]
-
-        # if classifier
-        if classify:
-
-            # run random forest
-            self._stamp('running random forest for {}...'.format(target), initial=True)
-            self._print('matrix: {}'.format(matrix.shape))
-            forest = RandomForestClassifier(n_estimators=100, max_depth=5)
-            forest.fit(matrix, truth)
-
-        # otherwise
-        else:
-
-            # run random forest
-            self._stamp('running random forest for {}...'.format(target), initial=True)
-            self._print('matrix: {}'.format(matrix.shape))
-            forest = RandomForestRegressor(n_estimators=100, max_depth=5)
-            forest.fit(matrix, truth)
-
-        # predict from training
-        prediction = forest.predict(matrix)
-
-        # calculate score
-        score = forest.score(matrix, truth)
-        report.append(self._print('score: {}'.format(score)))
-
-        # get importances
-        importances = forest.feature_importances_
-        pairs = [(field, importance) for field, importance in zip(names, importances)]
-        pairs.sort(key=lambda pair: pair[1], reverse=True)
-        for field, importance in pairs:
-
-            # add to report
-            report.append(self._print('importance for {}: {}'.format(field, importance)))
-
-        # make report
-        self._jot(report, destination)
-
-        # print status
-        self._stamp('planted.')
-
-        # if giving output
-        package = None
-        if give:
-
-            # set package to tree
-            package = forest
-
-        return package
-
-    def renew(self):
-        """Renew the file list.
-
-        Arguments:
-            None
-
-        Returns:
-            None
-        """
-
-        # register
-        self._register()
-
-        return None
-
-    def scrounge(self, path=None):
-        """Dig up the nested metadata fields and attributes.
-
-        Arguments:
-            path: str, filepath
-
-        Returns:
-            None
-        """
-
-        # set path to current by default
-        path = path or self.current
-
-        # create netcdf4 interface
-        with self.nether(path) as net:
-
-            # scrounge for all metadata
-            self._seek(net)
+            self._stash(cascade, destination, 'Data')
 
         return None
 
@@ -3696,53 +2033,7 @@ class Hydra(Core):
         destination = '{}/{}_{}.h5'.format(folder, name, tags)
 
         # stash subset
-        self.stash(independents + subset, destination, 'Data')
-
-        return None
-
-    def spawn(self, destination, data, attributes=None, net=False, globals=None):
-        """Create an hdf file at destination from a dictionary of arrays.
-
-        Arguments:
-            destination: str, pathname of destination file
-            data: dict of str: numpy address / array pairs
-            attributes: dict of attribute dictionaries
-            dimensions: dict of dimension scales
-            net: boolean, use netcdf4?
-            globals: dict of global attributes
-
-        Returns:
-            None
-        """
-
-        # set attributes and dimensions reservoir
-        attributes = attributes or {}
-
-        self._print('making features...')
-
-        # for each member
-        features = []
-        for address, array in data.items():
-
-            # search for attributes
-            attribute = attributes.get(address, {})
-
-            # create feature
-            # feature = Feature(address.split('/'), numpy.array(array), attributes=attribute)
-            feature = Feature(address.split('/'), array, attributes=attribute)
-            features.append(feature)
-
-        # if netcdf4
-        if net:
-
-            # stash file using netCDF4
-            self.store(features, destination, globals=globals)
-
-        # otherwise
-        else:
-
-            # stash file at destination using h5py
-            self.stash(features, destination, globals=globals)
+        self._stash(independents + subset, destination, 'Data')
 
         return None
 
@@ -3774,283 +2065,22 @@ class Hydra(Core):
         [feature.update({'link': True}) for feature in features if 'Categories' in feature.slash]
 
         # stash at new destination
-        self.stash(features, destination, link='Data')
+        self._stash(features, destination, link='Data')
 
         return None
 
-    def stash(self, features, destination, link=None, mode='w', compression=None, scan=False, globals=None):
-        """Stash a group of features in an hdf5 file.
-
-        Arguments:
-            features: list of dicts
-            destination: str, destination filepath
-            link: str, name of link folder
-            mode: str, writemode
-            compression: compression option
-            scan: scan feature names?
-            globals: dict of global attributes
-
-        Returns:
-            None
-        """
-
-        # fill all features if not yet filled
-        [feature.fill() for feature in features]
-
-        # remove automatic linking
-        # [feature.update({'link': False}) for feature in features if 'IndependentVariables' in feature.slash]
-        # [feature.update({'link': False}) for feature in features if 'Categories' in feature.slash]
-
-        # begin file
-        five = h5py.File(destination, mode, track_order=True)
-
-        # get list of all groups, maintaining feature order
-        addresses = [feature.slash.split('/')[:-1] for feature in features]
-        groups = [['/'.join(address[:index + 1]) for index, _ in enumerate(address)] for address in addresses]
-        groups = [address for group in groups for address in group]
-
-        # eliminate duplicates and empty name
-        groups = list({group: True for group in groups if group}.keys())
-
-        # sort groups and features by name
-        groups.sort()
-        features.sort(key=lambda feature: feature.slash)
-
-        # create groups
-        for address in groups:
-
-            # print
-            self._print(address)
-
-            # try to
-            try:
-
-                # add the group, tracking order
-                group = five.create_group(address, track_order=True)
-
-            # unless python 2, without this option
-            except TypeError:
-
-                # try to
-                try:
-
-                    # ignore track order option
-                    group = five.create_group(address)
-
-                # unless already exists
-                except ValueError:
-
-                    # pass and alert
-                    self._print('{} group already exits'.format(link))
-                    pass
-
-            # unless already exists
-            except ValueError:
-
-                # pass and alert
-                self._print('{} group already exits'.format(link))
-                pass
-
-        # if a link is given
-        links = None
-        if link:
-
-            # try to
-            try:
-
-                # create links folder, with track_order option
-                links = five.create_group(link)
-
-            # unless already exists
-            except ValueError:
-
-                # pass and alert
-                self._print('{} group already exits'.format(link))
-                links = five[link]
-
-        # go through each feature
-        for feature in features:
-
-            # if scanning
-            if scan:
-
-                # print feature
-                self._print(feature.name, feature.slash, feature.data.dtype)
-
-            # if string
-            if '<U' in str(feature.data.dtype):
-
-                # reformat
-                feature.data = feature.data.astype('S')
-
-            # try to
-            try:
-
-                # add dataset
-                tensor = five.create_dataset(feature.slash, data=feature.data, compression=compression)
-
-                # for each attribute
-                for attribute, information in feature.attributes.items():
-
-                    # add to tensor
-                    tensor.attrs[attribute] = information
-
-                # # if feature in dimensions
-                # if feature.slash in dimensions.keys():
-                #
-                #     # also add dummy variable to activate dimension
-                #     slash = 'dimensions/{}'.format(feature.slash)
-                #     data = numpy.array(list(range(dimensions[feature.slash])))
-                #     dummy = five.create_dataset(slash, data=data, compression=compression)
-                #     dummy.make_scale(self._file(slash))
-                #
-                #     # attach to tensor
-                #     tensor.dims[0].attach_scale(dummy)
-
-                # create link
-                if feature.link:
-
-                    # add tensor as link
-                    links[feature.name] = tensor
-
-            # unless already exists
-            except (ValueError, RuntimeError, OSError, TypeError) as error:
-
-                # alert if desired
-                if scan:
-
-                    # print error
-                    self._print('skipping {}: {}'.format(feature.slash, error))
-
-        # if globals are present
-        if globals:
-
-            # for each global
-            for name, contents in globals.items():
-
-                # add to attrs
-                five.attrs[name] = contents
-
-        # close hdf5 file
-        five.close()
-
-        # print messate
-        self._print('{} stashed.'.format(destination))
-
-        return None
-
-    def store(self, features, destination, globals=None, link=None, mode='w', compression=None, scan=False):
-        """Stash a group of features in a netCDF file.
-
-        Arguments:
-            features: list of dicts
-            destination: str, destination filepath
-            globals: dict of global attributes
-            link: str, name of link folder
-            mode: str, writemode
-            compression: compression option
-            scan: scan feature names?
-            dimensions: dict of dimension scales
-
-        Returns:
-            None
-        """
-
-        # fill all features if not yet filled
-        [feature.fill() for feature in features]
-
-        # set globals
-        globals = globals or {}
-
-        # begin netcdf4 file
-        with netCDF4.Dataset(destination, mode='w', format='NETCDF4') as net:
-
-            # for each global
-            for name, contents in globals.items():
-
-                # add to attributes
-                net.setncattr(name, contents)
-
-            # get all groups
-            groups = [self._fold(feature.slash) for feature in features]
-            groups = self._skim(groups)
-            groups.sort()
-
-            # separate varialbes and dimensions
-            dimensions = [feature for feature in features if feature.attributes.get('dimension', False)]
-            variables = [feature for feature in features if not feature.attributes.get('dimension', False)]
-
-            # for each group
-            for name in groups:
-
-                # if name not blank
-                if name:
-
-                    # create group
-                    group = net.createGroup(name)
-
-                    # for each global
-                    for name, contents in globals.items():
-
-                        # also add to group attributes for now
-                        group.setncattr(name, contents)
-
-            # for each dimension:
-            for feature in dimensions:
-
-                # print status
-                self._print('dimension: ', feature.name, feature.attributes['size'])
-
-                # unpack label
-                group = self._fold(feature.slash)
-                name = self._file(feature.slash)
-                size = feature.attributes['size']
-
-                # if group is legit
-                if group:
-
-                    # create dimension
-                    _ = net[group].createDimension(name, size)
-
-                # otherwise
-                else:
-
-                    # create as root dimension
-                    _ = net.createDimension(name, size)
-
-            # for each variable
-            for feature in variables:
-
-                # print status
-                self._print(feature.name, feature.shape, feature.data.shape, feature.data.dtype)
-
-                # get dimension scales
-                scales = feature.attributes.get('dimensions', ())
-
-                # construct variable with compression features
-                variable = net.createVariable(feature.slash, feature.data.dtype, scales, zlib=True, complevel=9)
-
-                # add the data
-                variable[:] = feature.data
-
-        return None
-
-    def survey(self, search=None):
+    def survey(self, features=None):
         """Survey all features.
 
         Arguments:
-            search: str, search string
+            features: list of dicts
 
         Returns:
             None
         """
 
         # default features to self
-        features = list(self)
-        if search:
-
-            # dig up the features
-            features = self.dig(search)
+        features = features or list(self)
 
         # if there are features
         if len(features) > 0:
@@ -4146,7 +2176,7 @@ class Hydra(Core):
 
         # add link and stash
         destination = path.replace(old, new).replace('.h5', '_{}.h5'.format(tag))
-        self.stash(variables + cascade, destination, 'Data', scan=True)
+        self._stash(variables + cascade, destination, 'Data', scan=True)
 
         return None
 
@@ -4208,6 +2238,6 @@ class Hydra(Core):
 
             # rewrite the file
             [feature.update({'link': True}) for feature in cascade if 'Categories' in feature.slash]
-            self.stash(cascade, destination, 'Data', scan=True)
+            self._stash(cascade, destination, 'Data', scan=True)
 
         return None
