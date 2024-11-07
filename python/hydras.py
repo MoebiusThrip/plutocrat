@@ -631,6 +631,37 @@ class Hydra(Core):
 
         return blueprint
 
+    def _distribute(self, array, number=11, masking=True):
+        """Report the percentile rankings of an array.
+
+        Arguments:
+            array: numpy array, the dataset
+            number: number of percentile steps
+            mask: boolean, mask out fill values and infinities?
+
+        Returns:
+            None
+        """
+
+        # create percentile steps
+        percentiles = numpy.linspace(0, 100, number)
+
+        # if masking
+        if masking:
+
+            # remove infinities and fills
+            mask = (numpy.isfinite(array)) & (abs(array) < 1e30)
+            array = array[mask]
+
+        # for each percentile
+        for percentile in percentiles:
+
+            # print
+            quantity = numpy.percentile(array, percentile)
+            self._print('{}th: {}'.format(int(percentile), quantity))
+
+        return None
+
     def _differ(self, first, second):
         """Get a list of differences between two arrays.
 
@@ -2604,7 +2635,7 @@ class Hydra(Core):
 
         return None
 
-    def contrast(self, path, pathii, percent=False):
+    def contrast(self, path, pathii, percent=False, address=False):
         """Determine span of percent differences for all arrays in the collection.
 
         Arguments:
@@ -2629,9 +2660,21 @@ class Hydra(Core):
         self.ingest(path)
         arrays = {feature.name: feature.distil() for feature in self}
 
+        # if using full addresses
+        if address:
+
+            # use full addresses
+            arrays = {feature.slash: feature.distil() for feature in self}
+
         # get second path arrays
         self.ingest(pathii)
         arraysii = {feature.name: feature.distil() for feature in self}
+
+        # if using full addresses
+        if address:
+
+            # use full addresses
+            arraysii = {feature.slash: feature.distil() for feature in self}
 
         # reingest current path
         self.ingest(current)
