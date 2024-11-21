@@ -3335,7 +3335,7 @@ class Hydra(Core):
 
         return lines
 
-    def merge(self, paths, destination, lead=False, squeeze=False):
+    def merge(self, paths, destination, lead=False, squeeze=False, prunes=None):
         """Merge together several congruent hdf5 files in order
 
         Arguments:
@@ -3343,6 +3343,7 @@ class Hydra(Core):
             destination: str
             lead: boolean, add new dimension?
             squeeze: boolean, squeeze out trivial dimensions?
+            prune: list of str, addresses of pruning fields
 
         Returns:
             None
@@ -3456,6 +3457,41 @@ class Hydra(Core):
         #[feature.update({'link': True}) for feature in features if 'Categories' in feature.slash]
         #[feature.update({'link': False}) for feature in features if 'IndependentVariables' in feature.slash]
         [feature.update({'link': False}) for feature in features]
+
+        # if pruning duplicates
+        if prunes:
+
+            # for each prune
+            for prune in prunes:
+
+                # try to
+                try:
+
+                    # get feature with name of prune
+                    feature = [feature for feature in features if prune in feature.slash][0]
+
+                    # get the array
+                    array = feature.distil()
+
+                    # get unique entries
+                    _, indices = numpy.unique(array, return_index=True)
+
+                    # for each feature
+                    for featureii in features:
+
+                        # if shape is compatible
+                        if featureii.shape[0] == array.shape[0]:
+
+                            # get data and prune to unique entries
+                            arrayii = featureii.distil()
+                            arrayii = arrayii[numpy.sort(indices)]
+                            featureii.instil(arrayii)
+
+                # unless not found
+                except IndexError:
+
+                    # print error
+                    self._print('{} not found, pruning skipped!'.format(prune))
 
         # stash
         self._print('stashing {}...'.format(destination))
