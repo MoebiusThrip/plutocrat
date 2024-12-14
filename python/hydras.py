@@ -631,7 +631,7 @@ class Hydra(Core):
 
         return blueprint
 
-    def _distribute(self, array, number=11, masking=True):
+    def _distribute(self, array, masking=True):
         """Report the percentile rankings of an array.
 
         Arguments:
@@ -644,7 +644,7 @@ class Hydra(Core):
         """
 
         # create percentile steps
-        percentiles = numpy.linspace(0, 100, number)
+        percentiles = [0, 1, 2, 3, 4, 5, 10, 20, 30, 40, 50, 60, 70, 80, 90, 95, 96, 97, 98, 99, 100]
 
         # if masking
         if masking:
