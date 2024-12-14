@@ -646,6 +646,10 @@ class Hydra(Core):
         # create percentile steps
         percentiles = [0, 1, 2, 3, 4, 5, 10, 20, 30, 40, 50, 60, 70, 80, 90, 95, 96, 97, 98, 99, 100]
 
+        # create suffixes
+        suffixes = {percentile: 'th' for percentile in percentiles}
+        suffixes.update({1: 'st', 2: 'nd', 3: 'rd'})
+
         # if masking
         if masking:
 
@@ -658,7 +662,7 @@ class Hydra(Core):
 
             # print
             quantity = numpy.percentile(array, percentile)
-            self._print('{}th: {}'.format(int(percentile), quantity))
+            self._print('{}{}: {}'.format(int(percentile), suffixes[int(percentile)], quantity))
 
         return None
 
