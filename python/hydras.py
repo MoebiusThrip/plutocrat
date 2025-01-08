@@ -480,6 +480,47 @@ class Hydra(Core):
 
         return contents
 
+    def _correlate(self, abscissa, ordinate, masking=True):
+        """Calculate the correlation coefficient between two variables.
+
+        Arguments:
+            abscissa: numpy array
+            ordinate: numpy array
+            masking: boolean, filter out fills and nans?
+
+        Returns:
+            float, correlation coefficient
+        """
+
+        # if masking:
+        if masking:
+
+            # set fills
+            fill = -999
+            fillii = 1e20
+
+            # get valid data mask
+            mask = (abscissa > fill) & (abs(abscissa) < fillii) & numpy.isfinite(abscissa)
+            maskii = (ordinate > fill) & (abs(ordinate) < fillii) & numpy.isfinite(ordinate)
+            masque = mask & maskii
+
+            # apply mask
+            abscissa = abscissa[masque]
+            ordinate = ordinate[masque]
+
+        # compute means
+        mean = abscissa.mean()
+        meanii = ordinate.mean()
+        bias = (abscissa - mean)
+        biasii = (ordinate - meanii)
+
+        # compute correlation
+        numerator = (bias * biasii).sum()
+        denominator = numpy.sqrt((bias ** 2).sum() * (biasii ** 2).sum())
+        correlation = numerator / denominator
+
+        return correlation
+
     def _cross(self, bounds):
         """Adjust for longitude bounds that cross the dateline.
 
@@ -2766,47 +2807,6 @@ class Hydra(Core):
         warnings.resetwarnings()
 
         return None
-
-    def correlate(self, abscissa, ordinate, masking=True):
-        """Calculate the correlation coefficient between two variables.
-
-        Arguments:
-            abscissa: numpy array
-            ordinate: numpy array
-            masking: boolean, filter out fills and nans?
-
-        Returns:
-            float, correlation coefficient
-        """
-
-        # if masking:
-        if masking:
-
-            # set fills
-            fill = -999
-            fillii = 1e20
-
-            # get valid data mask
-            mask = (abscissa > fill) & (abs(abscissa) < fillii) & numpy.isfinite(abscissa)
-            maskii = (ordinate > fill) & (abs(ordinate) < fillii) & numpy.isfinite(ordinate)
-            masque = mask & maskii
-
-            # apply mask
-            abscissa = abscissa[masque]
-            ordinate = ordinate[masque]
-
-        # compute means
-        mean = abscissa.mean()
-        meanii = ordinate.mean()
-        bias = (abscissa - mean)
-        biasii = (ordinate - meanii)
-
-        # compute correlation
-        numerator = (bias * biasii).sum()
-        denominator = numpy.sqrt((bias ** 2).sum() * (biasii ** 2).sum())
-        correlation = numerator / denominator
-
-        return correlation
 
     def differ(self, first, second, reference=None):
         """Construct a dataset of differences between two files.
