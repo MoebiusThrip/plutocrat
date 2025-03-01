@@ -3616,6 +3616,7 @@ class Hydra(Core):
         report.append('')
 
         # if masking:
+        masque = None
         if masking:
 
             # set fills
@@ -3654,7 +3655,7 @@ class Hydra(Core):
             # run random forest
             self._stamp('running random forest for {}...'.format(target), initial=True)
             self._print('matrix: {}'.format(matrix.shape))
-            forest = RandomForestClassifier(n_estimators=100, max_depth=5)
+            forest = RandomForestClassifier(n_estimators=100, max_depth=5, class_weight='balanced')
             forest.fit(matrix, truth)
 
         # otherwise
@@ -3693,7 +3694,8 @@ class Hydra(Core):
         if give:
 
             # set package to tree
-            package = forest
+            package = {'model': forest, 'matrix': matrix, 'truth': truth, 'prediction': prediction}
+            package.update({'score': score, 'importance': pairs, 'mask': masque})
 
         return package
 
