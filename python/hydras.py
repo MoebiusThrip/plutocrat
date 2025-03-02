@@ -3669,6 +3669,7 @@ class Hydra(Core):
 
         # predict from training
         prediction = forest.predict(matrix)
+        probability = forest.predict_proba(matrix)
 
         # calculate score
         score = forest.score(matrix, truth)
@@ -3695,7 +3696,7 @@ class Hydra(Core):
 
             # set package to tree
             package = {'model': forest, 'matrix': matrix, 'truth': truth, 'prediction': prediction}
-            package.update({'score': score, 'importance': pairs, 'mask': masque})
+            package.update({'score': score, 'importance': pairs, 'mask': masque, 'probability': probability})
 
         return package
 
