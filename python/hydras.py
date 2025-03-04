@@ -60,8 +60,9 @@ except (ImportError, SystemError):
     # in which case, nevermind
     pass
 
-# import random forest
+# import random forest and pca
 from sklearn.ensemble import RandomForestRegressor, RandomForestClassifier
+from sklearn.decomposition import PCA
 
 
 # class Hydra to parse hdf files
@@ -3595,7 +3596,7 @@ class Hydra(Core):
 
         return net
 
-    def plant(self, data, target, destination, masking=True, header=None, classify=False, give=False):
+    def plant(self, data, target, destination, masking=True, header=None, classify=False, decompose=True, give=False):
         """Use random forest to predict target value from data
 
         Arguments:
@@ -3605,6 +3606,7 @@ class Hydra(Core):
             masking: boolean, apply nan and fill mask first?
             header: header for report
             classify: boolean, use classifier?
+            decompose: boolean, use PCA?
             give: boolean, return forest as output?
 
         Returns:
@@ -3649,6 +3651,20 @@ class Hydra(Core):
         matrix = train[:, :-1]
         truth = train[:, -1]
 
+        # normalize matrix
+        mean = matrix.mean(axis=0)
+        deviation = matrix.std(axis=0)
+        matrix = (matrix - mean) / deviation
+
+        # default vectors to None unless using PCA
+        vectors = None
+        if decompose:
+
+            # in which case, fit PCA on inputs and get coefficients
+            decomposer = PCA(n_components=matrix.shape[1])
+            matrix = decomposer.fit_transform(matrix)
+            vectors = decomposer.components_
+
         # if classifier
         if classify:
 
@@ -3669,7 +3685,13 @@ class Hydra(Core):
 
         # predict from training
         prediction = forest.predict(matrix)
-        probability = forest.predict_proba(matrix)
+
+        # default probability to None, unless using classiifer
+        probability = None
+        if classify:
+
+            # in which case, calculate probabilities
+            probability = forest.predict_proba(matrix)
 
         # calculate score
         score = forest.score(matrix, truth)
@@ -3677,6 +3699,14 @@ class Hydra(Core):
 
         # get importances
         importances = forest.feature_importances_
+
+        # if using pca
+        if decompose:
+
+            # multiple importances by eigenvectors to get weighted importances by feature
+            importances = numpy.matmul(importances, abs(vectors))
+
+        # pair with original features
         pairs = [(field, importance) for field, importance in zip(names, importances)]
         pairs.sort(key=lambda pair: pair[1], reverse=True)
         for field, importance in pairs:
@@ -3697,6 +3727,7 @@ class Hydra(Core):
             # set package to tree
             package = {'model': forest, 'matrix': matrix, 'truth': truth, 'prediction': prediction}
             package.update({'score': score, 'importance': pairs, 'mask': masque, 'probability': probability})
+            package.update({'vectors': vectors, 'mean': mean, 'deviation': deviation, 'features': names})
 
         return package
 
