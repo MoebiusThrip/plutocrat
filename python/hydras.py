@@ -706,6 +706,12 @@ class Hydra(Core):
             quantity = numpy.percentile(array, percentile)
             self._print('{}{}: {}'.format(int(percentile), suffixes[int(percentile)], quantity))
 
+            # if 5 or 90
+            if percentile in (5, 90):
+
+                # print extract space
+                self._print('')
+
         return None
 
     def _differ(self, first, second):
