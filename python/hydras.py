@@ -3706,6 +3706,9 @@ class Hydra(Core):
             # multiple importances by eigenvectors to get weighted importances by feature
             importances = numpy.matmul(importances, abs(vectors))
 
+            # normalize
+            importances = importances / importances.sum()
+
         # pair with original features
         pairs = [(field, importance) for field, importance in zip(names, importances)]
         pairs.sort(key=lambda pair: pair[1], reverse=True)
