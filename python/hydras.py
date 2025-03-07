@@ -3660,6 +3660,7 @@ class Hydra(Core):
         # normalize matrix
         mean = matrix.mean(axis=0)
         deviation = matrix.std(axis=0)
+        deviation = numpy.where(deviation > 0, deviation, 1)
         matrix = (matrix - mean) / deviation
 
         # default vectors to None unless using PCA
