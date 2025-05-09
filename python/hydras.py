@@ -912,7 +912,7 @@ class Hydra(Core):
 
         return corners
 
-    def _garner(self, data, path, route=None, mode=None, scan=False):
+    def _garner(self, data, path, route=None, mode=None, scan=False, top=False):
         """Gather all routes and shapes from a datafile.
 
         Arguments:
@@ -920,6 +920,7 @@ class Hydra(Core):
             path: str, file path
             route=None: current route
             mode=None: mode to restrict gathering with
+            top: boolean, top level of file?
 
         Returns:
             list of dicts
@@ -948,8 +949,17 @@ class Hydra(Core):
             # try to
             try:
 
+                # create fields
+                fields = list(data.groups.keys())
+
+                # if top level
+                if top:
+
+                    # add 'top' to fields
+                    fields = ['top'] + fields
+
                 # get all fields
-                for field in data.groups:
+                for field in fields:
 
                     # if scan
                     if scan:
@@ -962,8 +972,17 @@ class Hydra(Core):
                     #
                     # self._print(slash)
 
-                    # get variables
-                    variables = data[field].variables
+                    # if top level
+                    if field == 'top':
+
+                        # get variables from root
+                        variables = data.variables
+
+                    # otherwise
+                    else:
+
+                        # get variables
+                        variables = data[field].variables
 
                     # for each variable
                     for variable, info in variables.items():
@@ -981,8 +1000,17 @@ class Hydra(Core):
                         feature = Feature(**parameters)
                         collection.append(feature)
 
-                    # get dimensions
-                    dimensions = data[field].dimensions
+                    # if top level
+                    if field == 'top':
+
+                        # get dimensions from root
+                        dimensions = data.dimensions
+
+                    # otherwise
+                    else:
+
+                        # get dimensions from group
+                        dimensions = data[field].dimensions
 
                     # for each variable
                     for dimension, info in dimensions.items():
@@ -1001,25 +1029,29 @@ class Hydra(Core):
                         feature = Feature(**parameters)
                         collection.append(feature)
 
-                    # get groups
-                    groups = data[field].groups
+                    # if not top level
+                    groups = None
+                    if field != 'top':
 
-                    # if there are no groups, variables or dimensions
-                    if not groups and not variables and not dimensions:
+                        # get groups
+                        groups = data[field].groups
 
-                        # begin attributes with dimensions
-                        info = {attribute: data[field].getncattr(attribute) for attribute in data[field].ncattrs()}
-                        attributes = {'netCDF': True, 'metadata': True}
-                        attributes.update(info)
+                        # if there are no groups, variables or dimensions
+                        if not groups and not variables and not dimensions:
 
-                        # add entry to collection
-                        parameters = {'route': route + [field], 'shape': (0,), 'path': path}
-                        parameters.update({'attributes': attributes, 'format': str})
-                        feature = Feature(**parameters)
-                        collection.append(feature)
+                            # begin attributes with dimensions
+                            info = {attribute: data[field].getncattr(attribute) for attribute in data[field].ncattrs()}
+                            attributes = {'netCDF': True, 'metadata': True}
+                            attributes.update(info)
 
-                    # and add each field to the collection
-                    collection += self._garner(data[field], path, route + [field], mode=mode, scan=scan)
+                            # add entry to collection
+                            parameters = {'route': route + [field], 'shape': (0,), 'path': path}
+                            parameters.update({'attributes': attributes, 'format': str})
+                            feature = Feature(**parameters)
+                            collection.append(feature)
+
+                        # and add each field to the collection
+                        collection += self._garner(data[field], path, route + [field], mode=mode, scan=scan)
 
             # unless it is an endpoint
             except AttributeError:
@@ -3103,7 +3135,7 @@ class Hydra(Core):
             with self._fetch(path) as five:
 
                 # collect all features
-                features = self._garner(five, path, mode=mode, scan=scan)
+                features = self._garner(five, path, mode=mode, scan=scan, top=True)
                 self._populate(features, discard=discard)
 
         # otherwise
