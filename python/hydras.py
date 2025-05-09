@@ -977,12 +977,14 @@ class Hydra(Core):
 
                         # get variables from root
                         variables = data.variables
+                        routeii = route
 
                     # otherwise
                     else:
 
                         # get variables
                         variables = data[field].variables
+                        routeii = route + [field]
 
                     # for each variable
                     for variable, info in variables.items():
@@ -995,7 +997,7 @@ class Hydra(Core):
                             attributes[attribute] = info.getncattr(attribute)
 
                         # add entry to collection
-                        parameters = {'route': route + [field, variable], 'shape': info.shape, 'path': path}
+                        parameters = {'route': routeii + [variable], 'shape': info.shape, 'path': path}
                         parameters.update({'attributes': attributes, 'format': info.dtype})
                         feature = Feature(**parameters)
                         collection.append(feature)
@@ -1024,7 +1026,7 @@ class Hydra(Core):
                         attributes.update({'net': True})
 
                         # add entry to collection
-                        parameters = {'route': route + [field, dimension], 'shape': (info.size,), 'path': path}
+                        parameters = {'route': routeii + [dimension], 'shape': (info.size,), 'path': path}
                         parameters.update({'attributes': attributes, 'format': int})
                         feature = Feature(**parameters)
                         collection.append(feature)
