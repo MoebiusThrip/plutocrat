@@ -2193,7 +2193,7 @@ class Hydra(Core):
         # extract the orbit specifics
         date = re.search('[0-9]{4}m[0-9]{4}t[0-9]{4}', path)
         orbit = re.search('-o[0-9]{5,6}', path)
-        product = re.search('OM[A-Z, a-z, 0-9]{3,10}', path)
+        product = re.search('OM[A-Z, a-z, 0-9]{3,15}', path)
         production = re.search('[0-9]{4}m[0-9]{4}t[0-9]{4}', path.split('_')[-1])
         version = re.search('_v[0-9]{3,4}', path)
         extension = '.{}'.format(path.split('.')[-1])
