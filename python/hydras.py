@@ -2119,6 +2119,21 @@ class Hydra(Core):
 
         return None
 
+    def _select(self, *words):
+        """Select paths from directory that include all words.
+
+        Arguments:
+            *words: unpacked list of str, the keywords
+
+        Returns:
+            list of str, the paths that fit the criteria.
+        """
+
+        # get sublist
+        paths = [path for path in self.paths if all([word in path for word in words])]
+
+        return paths
+
     def _serpentize(self, name):
         """Make a camel case name into snake case.
 
