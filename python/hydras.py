@@ -1274,6 +1274,106 @@ class Hydra(Core):
 
         return pixels
 
+    def _obtain(self, path, route, indices):
+        """Scrounge particular data from hdf4 without conversion.
+
+        Arguments:
+            path: hdf4 path
+            route: list of str, partial field names
+            indices: list of int, remaining indices
+
+        Returns:
+            float / int
+        """
+
+        # default code to 0
+        code = 0
+
+        # convert path to hdf4
+        four = HDF(path)
+        science = SD(path)
+
+        # initialize group and table interfaces
+        groups = four.vgstart()
+        tables = four.vstart()
+
+        # get all groups
+        registry = self._scan(four)
+
+        # get group registration by finding the route
+        steps = route[:-1]
+        parameter = route[-1]
+        subset = [number for number, address in registry.items() if all([step in ' '.join(address) for step in steps])]
+
+        # if there are available entries
+        if len(subset) > 1:
+
+            # get tags
+            group = groups.attach(subset[0])
+            tags = group.tagrefs()
+            for tag, number in tags:
+
+                # check for scientific dataset
+                if tag == HC.DFTAG_NDG:
+
+                    # get attributes
+                    dataset = science.select(science.reftoindex(number))
+                    name, rank, dims, type, _ = dataset.info()
+
+                    # check for specific name
+                    if name == parameter:
+
+                        # get data and add to feature
+                        parcel = dataset.get()
+
+                        # for each index
+                        datum = parcel
+                        for index in indices:
+
+                            # get the datum
+                            datum = datum[index]
+
+                        # set code
+                        code = datum
+
+                # check for vdata
+                elif tag == HC.DFTAG_VH:
+
+                    # get attributes
+                    table = tables.attach(number)
+                    records, _, _, size, name = table.inquire()
+
+                    # check for specific name
+                    if name == parameter:
+
+                        # read all lines to get data
+                        descending = lambda line: line[0] if len(line) < 2 else line
+                        parcel = [descending(table.read()[0]) for _ in range(records)]
+
+                        # for each index
+                        datum = parcel
+                        for index in indices:
+
+                            # get the datum
+                            datum = datum[index]
+
+                        # set code
+                        code = datum
+
+                    # detach table
+                    table.detach()
+
+            # detach group
+            group.detach()
+
+        # close groups, tables, and files
+        groups.end()
+        tables.end()
+        science.end()
+        four.close()
+
+        return code
+
     def _orient(self, degrees, east=False, clip=False):
         """Construct an oriented latitude or longitude tag from a signed decimal.
 
@@ -1986,138 +2086,46 @@ class Hydra(Core):
 
         return registry
 
-    def _scrounge(self, path, route, indices):
-        """Scrounge particular data from hdf4 without conversion.
-
-        Arguments:
-            path: hdf4 path
-            route: list of str, partial field names
-            indices: list of int, remaining indices
-
-        Returns:
-            float / int
-        """
-
-        # default code to 0
-        code = 0
-
-        # convert path to hdf4
-        four = HDF(path)
-        science = SD(path)
-
-        # initialize group and table interfaces
-        groups = four.vgstart()
-        tables = four.vstart()
-
-        # get all groups
-        registry = self._scan(four)
-
-        # get group registration by finding the route
-        steps = route[:-1]
-        parameter = route[-1]
-        subset = [number for number, address in registry.items() if all([step in ' '.join(address) for step in steps])]
-
-        # if there are available entries
-        if len(subset) > 1:
-
-            # get tags
-            group = groups.attach(subset[0])
-            tags = group.tagrefs()
-            for tag, number in tags:
-
-                # check for scientific dataset
-                if tag == HC.DFTAG_NDG:
-
-                    # get attributes
-                    dataset = science.select(science.reftoindex(number))
-                    name, rank, dims, type, _ = dataset.info()
-
-                    # check for specific name
-                    if name == parameter:
-
-                        # get data and add to feature
-                        parcel = dataset.get()
-
-                        # for each index
-                        datum = parcel
-                        for index in indices:
-
-                            # get the datum
-                            datum = datum[index]
-
-                        # set code
-                        code = datum
-
-                # check for vdata
-                elif tag == HC.DFTAG_VH:
-
-                    # get attributes
-                    table = tables.attach(number)
-                    records, _, _, size, name = table.inquire()
-
-                    # check for specific name
-                    if name == parameter:
-
-                        # read all lines to get data
-                        descending = lambda line: line[0] if len(line) < 2 else line
-                        parcel = [descending(table.read()[0]) for _ in range(records)]
-
-                        # for each index
-                        datum = parcel
-                        for index in indices:
-
-                            # get the datum
-                            datum = datum[index]
-
-                        # set code
-                        code = datum
-
-                    # detach table
-                    table.detach()
-
-            # detach group
-            group.detach()
-
-        # close groups, tables, and files
-        groups.end()
-        tables.end()
-        science.end()
-        four.close()
-
-        return code
-
-    def _seek(self, group, names=None):
+    def _seek(self, group, names=None, report=None, display=True):
         """Seek nested metadata attributes in a netcdf group.
 
         Arguments:
             group: netCDF group
             names: list of previous groups
+            report: list of enries
+            display: boolean, display to screen?
 
         Returns:
-            None
+            list of str
         """
 
         # set default names
         names = names or []
 
+        # set default report
+        report = report or []
+
         # print name
-        self._print('')
-        self._print('{}: '.format('/'.join(names)))
+        report.append(self._print('', display=display))
+        report.append(self._print('{}: '.format('/'.join(names)), display=display))
 
         # get all attributes
         attributes = group.ncattrs()
 
         # for each attribute
-        [self._print('{}: {}'.format(attribute, group.getncattr(attribute))) for attribute in attributes]
+        for attribute in attributes:
+
+            # for each attribute
+            report.append(self._print('{}: {}'.format(attribute, group.getncattr(attribute)), display=display))
 
         # get all nested gruops
         groups = group.groups
         for key in groups.keys():
 
             # check next level
-            self._seek(group[key], names + [key])
+            report = self._seek(group[key], names + [key], report=report, display=display)
 
-        return None
+        return report
 
     def _select(self, *words):
         """Select paths from directory that include all words.
@@ -3771,15 +3779,19 @@ class Hydra(Core):
 
         return None
 
-    def scrounge(self, path=None):
+    def scrounge(self, path=None, display=True):
         """Dig up the nested metadata fields and attributes.
 
         Arguments:
             path: str, filepath
+            display: boolean, display to screen?
 
         Returns:
-            None
+            list of str
         """
+
+        # begin report
+        report = []
 
         # set path to current by default
         path = path or self.current
@@ -3788,9 +3800,9 @@ class Hydra(Core):
         with self.nether(path) as net:
 
             # scrounge for all metadata
-            self._seek(net)
+            report = self._seek(net, report=report, display=display)
 
-        return None
+        return report
 
     def sieve(self, name, fields, conditions):
         """Pull the data from a parameter based on matching conditions of other fields.
