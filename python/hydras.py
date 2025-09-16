@@ -3369,7 +3369,7 @@ class Hydra(Core):
 
         return lines
 
-    def merge(self, paths, destination, lead=False, squeeze=False, prunes=None):
+    def merge(self, paths, destination, lead=False, squeeze=False, prunes=None, compression=None):
         """Merge together several congruent hdf5 files in order
 
         Arguments:
@@ -3378,6 +3378,7 @@ class Hydra(Core):
             lead: boolean, add new dimension?
             squeeze: boolean, squeeze out trivial dimensions?
             prune: list of str, addresses of pruning fields
+            compression: str, compression option
 
         Returns:
             None
@@ -3529,7 +3530,7 @@ class Hydra(Core):
 
         # stash
         self._print('stashing {}...'.format(destination))
-        self.stash(features, destination, mode='w')
+        self.stash(features, destination, mode='w', compression=compression)
 
         # print status
         self._print('stashed {}.'.format(destination))
@@ -3876,7 +3877,7 @@ class Hydra(Core):
 
         return None
 
-    def spawn(self, destination, data, attributes=None, net=False, globals=None):
+    def spawn(self, destination, data, attributes=None, net=False, globals=None, compression=None):
         """Create an hdf file at destination from a dictionary of arrays.
 
         Arguments:
@@ -3886,6 +3887,7 @@ class Hydra(Core):
             dimensions: dict of dimension scales
             net: boolean, use netcdf4?
             globals: dict of global attributes
+            compression: str, compression option
 
         Returns:
             None
@@ -3918,7 +3920,7 @@ class Hydra(Core):
         else:
 
             # stash file at destination using h5py
-            self.stash(features, destination, globals=globals)
+            self.stash(features, destination, globals=globals, compression=compression)
 
         return None
 
@@ -3962,7 +3964,7 @@ class Hydra(Core):
             destination: str, destination filepath
             link: str, name of link folder
             mode: str, writemode
-            compression: compression option
+            compression: str, compression option
             scan: scan feature names?
             globals: dict of global attributes
 
@@ -4063,7 +4065,7 @@ class Hydra(Core):
             try:
 
                 # add dataset
-                tensor = five.create_dataset(feature.slash, data=feature.data, compression=compression)
+                tensor = five.create_dataset(feature.slash, data=feature.data, compression=compression, shuffle=True)
 
                 # for each attribute
                 for attribute, information in feature.attributes.items():
