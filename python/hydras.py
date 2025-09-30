@@ -3369,7 +3369,7 @@ class Hydra(Core):
 
         return lines
 
-    def merge(self, paths, destination, lead=False, squeeze=False, prunes=None, compression=None):
+    def merge(self, paths, destination, lead=False, squeeze=False, prunes=None, compression=None, alterations=None):
         """Merge together several congruent hdf5 files in order
 
         Arguments:
@@ -3379,10 +3379,14 @@ class Hydra(Core):
             squeeze: boolean, squeeze out trivial dimensions?
             prune: list of str, addresses of pruning fields
             compression: str, compression option
+            alterations: dict of name, functions to apply to arrays
 
         Returns:
             None
         """
+
+        # set default alternations
+        alterations = alterations or {}
 
         # split paths into primary and secondaries by default
         primary = paths[0]
@@ -3527,6 +3531,18 @@ class Hydra(Core):
 
                     # print error
                     self._print('{} not found, pruning skipped!'.format(prune))
+
+        # for each alteration
+        for name, alteration in alterations.items():
+
+            # for each feature
+            for feature in features:
+
+                # if name in feature
+                if name in feature.name:
+
+                    # apply alteration
+                    feature.instil(alteration(feature.distil()))
 
         # stash
         self._print('stashing {}...'.format(destination))
