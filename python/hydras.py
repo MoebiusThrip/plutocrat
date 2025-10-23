@@ -2971,6 +2971,29 @@ class Hydra(Core):
 
         return data
 
+    def force(self, path, field):
+        """Extract an array from an HDF4 file without converting.
+
+        Arguments:
+            path: str, HDF4 file path
+            field: str, field name
+
+        Returns:
+            numpy array
+        """
+
+        # make HDF4 connections
+        four = HDF(path)
+        science = SD(path)
+
+        # get the features
+        features = self._collect(four, science, names=[field])
+
+        # assume top feature and get array
+        array = features[0].distil()
+
+        return array
+
     def gist(self, pixel=None, address=False):
         """Summarize data in the file.
 
