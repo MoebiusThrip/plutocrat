@@ -4250,6 +4250,15 @@ class Hydra(Core):
                 # add the data
                 variable[:] = feature.data
 
+                # for each attribute
+                for attribute, details in feature.attributes.items():
+
+                    # if not dimensions
+                    if attribute not in ('dimensions',):
+
+                        # set it on the variable
+                        setattr(variable, attribute, details)
+
         return None
 
     def survey(self, search=None):
