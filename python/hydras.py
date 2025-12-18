@@ -2971,7 +2971,7 @@ class Hydra(Core):
 
         return data
 
-    def force(self, path, field):
+    def force(self, field, path):
         """Extract an array from an HDF4 file without converting.
 
         Arguments:
