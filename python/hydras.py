@@ -337,6 +337,7 @@ class Hydra(Core):
                     # get attributes
                     dataset = science.select(science.reftoindex(number))
                     name, rank, dims, type, _ = dataset.info()
+                    attributes = {attribute: details for attribute, details in dataset.attributes().items()}
 
                     # convert dims to list
                     try:
@@ -357,7 +358,8 @@ class Hydra(Core):
                         parcel = dataset.get()
 
                         # create feature
-                        feature = Feature(route + steps + [name], numpy.array([parcel]), tuple(dims), '', 'sd')
+                        parameters = (route + steps + [name], numpy.array([parcel]), tuple(dims), '', 'sd')
+                        feature = Feature(*parameters, attributes=attributes)
 
                         # add to collection
                         collection.append(feature)
@@ -2986,11 +2988,18 @@ class Hydra(Core):
         four = HDF(path)
         science = SD(path)
 
-        # get the features
-        features = self._collect(four, science, names=[field])
+        # get the first feature
+        feature = self._collect(four, science, names=[field])[0]
 
         # assume top feature and get array
-        array = features[0].distil()
+        array = feature.distil()
+
+        # get scale factor and add offset
+        factor = feature.attributes.get('scale_factor', 1.0)
+        offset = feature.attributes.get('add_offset', 0.0)
+
+        # apply factor and offset
+        array = (array * factor) + offset
 
         return array
 
