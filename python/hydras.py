@@ -4252,9 +4252,11 @@ class Hydra(Core):
 
                 # get dimension scales
                 scales = feature.attributes.get('dimensions', ())
+                fill = feature.attributes.get('_FillValue', -9999)
 
                 # construct variable with compression features
-                variable = net.createVariable(feature.slash, feature.data.dtype, scales, zlib=True, complevel=9)
+                options = {'zlib': True, 'complevel': 5, 'fill_value': fill}
+                variable = net.createVariable(feature.slash, feature.data.dtype, scales, **options)
 
                 # add the data
                 variable[:] = feature.data
@@ -4263,11 +4265,19 @@ class Hydra(Core):
                 for attribute, details in feature.attributes.items():
 
                     # if not dimensions
-                    if attribute not in ('dimensions',):
+                    if attribute not in ('dimensions', '_FillValue', 'netCDF'):
 
-                        # set it on the variable
-                        setattr(variable, attribute, details)
+                        # try to
+                        try:
 
+                            # set it on the variable
+                            setattr(variable, attribute, details)
+
+                        # unless incompatible type like bool
+                        except TypeError:
+
+                            # in which case, make it a string
+                            setattr(variable, attribute, str(details))
         return None
 
     def survey(self, search=None):
