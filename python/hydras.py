@@ -3057,7 +3057,7 @@ class Hydra(Core):
 
         return None
 
-    def grab(self, search, index=0, reference=None):
+    def grab(self, search, index=0, reference=None, subset=None):
         """Grab the first array based on the search.
 
         Arguments:
@@ -3079,7 +3079,7 @@ class Hydra(Core):
         try:
 
             # get the first
-            array = features[index].distil()
+            array = features[index].distil(subset=subset)
 
         # unless nothing found
         except IndexError:
