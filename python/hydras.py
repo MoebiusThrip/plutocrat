@@ -1892,7 +1892,7 @@ class Hydra(Core):
                     paths += self._see(self.source)
 
                 # unless it is not a directory
-                except NotADirectoryError:
+                except (NotADirectoryError, OSError):
 
                     # in which case, assume it is a file
                     paths += [self.source]
