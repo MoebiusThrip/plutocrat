@@ -1201,7 +1201,7 @@ class Hydra(Core):
 
         return None
 
-    def _insert(self, array, destination, name, category):
+    def _insert(self, array, destination, name, category=None):
         """Insert a feature into an hdf4 file.
 
         Arguments:
@@ -1213,6 +1213,9 @@ class Hydra(Core):
         Returns:
             None
         """
+
+        # set default category
+        category = category or [name]
 
         # begin hdf4 file
         four = HDF(destination, HC.WRITE | HC.CREATE)
