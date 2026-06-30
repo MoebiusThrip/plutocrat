@@ -4115,8 +4115,17 @@ class Hydra(Core):
             # try to
             try:
 
+                # begin dataset options
+                options = {'data': feature.data}
+
+                # if array is not a scalar
+                if len(feature.data.shape) > 0:
+
+                    # add compression options
+                    options.update({'compression': compression, 'shuffle': True})
+
                 # add dataset
-                tensor = five.create_dataset(feature.slash, data=feature.data, compression=compression, shuffle=True)
+                tensor = five.create_dataset(feature.slash, **options)
 
                 # for each attribute
                 for attribute, information in feature.attributes.items():
