@@ -3928,7 +3928,7 @@ class Hydra(Core):
 
         return None
 
-    def spawn(self, destination, data, attributes=None, net=False, globals=None, compression=None):
+    def spawn(self, destination, data, attributes=None, net=False, globals=None, compression='gzip'):
         """Create an hdf file at destination from a dictionary of arrays.
 
         Arguments:
