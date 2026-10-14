@@ -61,6 +61,9 @@ import yaml
 import datetime
 import time
 
+# import pickle
+import pickle
+
 # import pretty print
 import pprint
 
@@ -797,6 +800,43 @@ class Core(list):
         pad = pad.zfill(length)
 
         return pad
+
+    def _pickle(self, contents, jar):
+        """Create a pickle file.
+
+        Arguments:
+            contents: dict, contents for pickling
+            jar: str, file name
+
+        Returns:
+            None
+        """
+
+        # with an open pickle
+        with open(jar, 'wb') as file:
+
+            # store contents
+            pickle.dump(contents, file)
+
+        return None
+
+    def _pour(self, jar):
+        """Unpickle a pickle file.
+
+        Arguments:
+            jar: str, file name
+
+        Returns:
+            dict, the contents
+        """
+
+        # with an open pickle
+        with open(jar, 'rb') as file:
+
+            # recover contents
+            contents = pickle.load(file)
+
+        return contents
 
     def _print(self, *messages, display=True):
         """Print the message, localizes print statements.
